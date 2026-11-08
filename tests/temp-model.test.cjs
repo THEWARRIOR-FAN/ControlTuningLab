@@ -250,3 +250,24 @@ test('speed options and slider ranges match the calibration targets', () => {
   assert.match(script, /let kp = 20\.0;\s*\n\s*let ki = 0\.0;/);   // 默认纯 P
   assert.match(script, /kd = 1000\.0;/);                            // PID 预设用可见的 D
 });
+
+test('target floor stops at 20 C while slider range stays 0-100', () => {
+  const run = createSimulation();
+  // 标称范围仍是 0–100；测试桩的 input 需要 min/max/step 才能走 adjustParam
+  assert.match(html, /id="setPoint" min="0" max="100" step="1"/);
+  run('Object.assign(document.getElementById("setPoint"), { min: "0", max: "100", step: "1" });');
+  // 拖到 15 → 钳回 20，滑块读数同步写回
+  run('document.getElementById("setPoint").value = "15"; document.getElementById("setPoint").oninput.call(document.getElementById("setPoint"));');
+  assert.equal(run('setPoint'), 20);
+  assert.equal(run('Number(document.getElementById("setPoint").value)'), 20);
+  // "-" 按钮：21 → 20，再按仍停在 20
+  run('setPoint = 21; document.getElementById("setPoint").value = "21"; adjustParam("setPoint", -1);');
+  assert.equal(run('setPoint'), 20);
+  run('adjustParam("setPoint", -1);');
+  assert.equal(run('setPoint'), 20);
+  // 拖到 0 同样钳到 20；正常区间不受影响
+  run('document.getElementById("setPoint").value = "0"; document.getElementById("setPoint").oninput.call(document.getElementById("setPoint"));');
+  assert.equal(run('setPoint'), 20);
+  run('document.getElementById("setPoint").value = "75"; document.getElementById("setPoint").oninput.call(document.getElementById("setPoint"));');
+  assert.equal(run('setPoint'), 75);
+});

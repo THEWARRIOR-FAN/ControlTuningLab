@@ -24,6 +24,8 @@
     window.setInterval(showNextTip, 6000);
 
     const gaugeBoxEl = document.getElementById("gaugeBox");
+    // 交互下限：目标温度最低 20 °C（环境温度，也是可达下限）；滑块标称范围仍是 0–100
+    const paramFloors = { setPoint: 20 };
     const potEl = document.getElementById("pot");
     const potWaterEl = document.getElementById("potWater");
     const tempBarEl = document.getElementById("tempBar");
@@ -137,7 +139,8 @@
 
     // 调参不重启系统：参数改动即时生效，系统从当前状态继续响应，便于观察过渡过程
     document.getElementById("setPoint").oninput = function () {
-      setPoint = parseFloat(this.value);
+      // 拉到 20 °C 就拉不动了：钳回交互下限，syncUI 把滑块读数写回
+      setPoint = Math.max(paramFloors.setPoint, parseFloat(this.value));
       syncUI();
     };
 

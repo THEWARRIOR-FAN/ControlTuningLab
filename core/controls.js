@@ -12,8 +12,11 @@ function roundToStep(v, step) {
 function adjustParam(name, delta) {
   const input = document.getElementById(name);
   const step = parseFloat(input.step) || 0.1;
+  // 页面可选交互下限（paramFloors，如调温页目标温度 ≥20 °C）；未定义时用滑块 min
+  const pageMin = (typeof paramFloors !== "undefined" && paramFloors[name] !== undefined)
+    ? paramFloors[name] : parseFloat(input.min);
   let value = roundToStep(parseFloat(input.value) + delta, step);
-  value = Math.max(parseFloat(input.min), Math.min(parseFloat(input.max), value));
+  value = Math.max(pageMin, Math.min(parseFloat(input.max), value));
 
   if (name === "setPoint") setPoint = value;
   if (name === "kp") kp = value * kpScale;
