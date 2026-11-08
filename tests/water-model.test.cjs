@@ -156,5 +156,5 @@ test('calibration: larger Kd increases overshoot in this inertialess tank', () =
   const withoutD = measureOvershoot('kp = 200; ki = 0.2; kd = 0;', 72000);
   const withD = measureOvershoot('kp = 200; ki = 0.2; kd = 20000;', 72000);
   assert.ok(withD - withoutD > 10,
-    `Kd=20000 应比无 D 多约 20 mm 超调，实测差 ${(withD - withoutD).toFixed(1)} mm`);
+    `Kd=20000 应比无 D 多约 21 mm 超调，实测差 ${(withD - withoutD).toFixed(1)} mm`);
 });
