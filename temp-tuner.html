@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>调温模型实验</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #f5f7fb; max-width: 1120px; margin: 0 auto; padding: 20px; color: #1f2937; }
+    h1 { text-align: center; margin: 0 0 8px; }
+    .subtitle { text-align: center; color: #6b7280; margin-bottom: 16px; min-height: 1.5em; transition: opacity .25s ease; cursor: pointer; user-select: none; }
+    .subtitle:hover { color: #2563eb; }
+    .subtitle.is-changing { opacity: 0; }
+    .container { display: flex; gap: 18px; align-items: flex-start; }
+    .panel { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(15,23,42,.08); }
+    .left { width: 330px; }
+    .right { flex: 1; }
+    h3 { margin: 0 0 12px; }
+    .param { margin: 14px 0; }
+    label { display: block; font-weight: 700; margin-bottom: 6px; color: #374151; }
+    input[type="range"] { width: 100%; }
+    .param-control { display: flex; align-items: center; gap: 8px; }
+    .value { color: #2563eb; font-weight: 700; min-width: 56px; display: inline-block; text-align: right; }
+    .btn { padding: 8px 12px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+    .btn:hover { background: #1d4ed8; }
+    .btn-auto { background: #16a34a; }
+    .btn-auto:hover { background: #15803d; }
+    .btn-secondary { background: #6b7280; }
+    .btn-secondary:hover { background: #4b5563; }
+    .param-btn { width: 34px; height: 34px; padding: 0; margin-top: 0; flex: 0 0 34px; }
+    .preset-btn { width: 100%; }
+    .status, .tips { line-height: 1.7; font-size: 14px; }
+    /* 温度刻度条：0–100 °C 双柱（橙 = 实际水温，蓝 = 测量温度），两柱顶差即传感器滞后 */
+    .gauge-box { position: relative; width: 100%; height: 300px; border: 1px solid #d1d5db; border-radius: 12px; margin: 14px 0 16px; background: #fff; overflow: hidden; }
+    .gauge-track { position: absolute; left: 10px; right: 10px; top: 12px; bottom: 66px;
+      background: repeating-linear-gradient(to top, #eef2f7 0 1px, transparent 1px 20%); }
+    /* 刻度：左侧 0–100 °C 标注，与 20% 网格线对齐 */
+    .scale-tick { position: absolute; left: 2px; font-size: 10px; color: #94a3b8; transform: translateY(50%); }
+    /* 目标温度线（红，实线）与实际水温基准线（橙，虚线） */
+    .target-line { position: absolute; left: 0; width: 100%; height: 3px; background: #ef4444; z-index: 10; }
+    .target-tag { position: absolute; right: 6px; top: -9px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+    .actual-line { position: absolute; left: 0; width: 100%; height: 0; border-top: 2px dashed #f97316; z-index: 9; }
+    .gauge-cols { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; gap: 44px; padding: 0 54px; }
+    .gauge-col { position: relative; width: 46px; height: 100%; background: #f8fafc; border: 1px solid #cbd5e1; border-bottom: none; border-radius: 8px 8px 0 0; overflow: hidden; }
+    .bar { position: absolute; left: 0; right: 0; bottom: 0; transition: height .1s linear; }
+    .bar-actual { background: linear-gradient(180deg, #fb923c, #ea580c); }
+    .bar-measured { background: linear-gradient(180deg, #60a5fa, #2563eb); }
+    /* 柱下读数：颜色与柱体一致 */
+    .gauge-labels { position: absolute; left: 0; right: 0; bottom: 44px; display: flex; justify-content: center; gap: 44px; font-size: 11px; color: #64748b; }
+    .gauge-labels span { width: 46px; text-align: center; white-space: nowrap; }
+    .lbl-actual { color: #c2410c; }
+    .lbl-measured { color: #1d4ed8; }
+    /* 传感器滞后的数值读出 */
+    .lag-tag { position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; font-size: 11px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+    /* 底部加热管：亮度/红热程度跟随实际功率 */
+    .heater { position: absolute; left: 12%; right: 12%; bottom: 8px; height: 14px; border-radius: 7px;
+      background: repeating-linear-gradient(90deg, #7f1d1d 0 10px, #b91c1c 10px 20px);
+      z-index: 8; transition: box-shadow .2s linear, background .2s linear; }
+    canvas { width: 100%; height: 260px; border: 1px solid #d1d5db; background: #fafafa; display: block; }
+    .status, .tips { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e5e7eb; }
+    .tips { color: #475569; }
+    /* 核心指标：四个关键量并排放大显示 */
+    .key-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
+    .metric { min-width: 0; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 5px; text-align: center; }
+    .metric-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #6b7280; margin-bottom: 2px; }
+    .metric-num { font-size: 21px; font-weight: 700; color: #1f2937; }
+    .metric-unit { font-size: 12px; color: #6b7280; }
+    .metric.is-error .metric-num { color: #dc2626; }
+    .balance-line { margin-top: 8px; font-size: 14px; color: #374151; }
+    /* 次要数据默认折叠，点开才显示 */
+    .more-data { margin-top: 8px; font-size: 13px; color: #475569; line-height: 1.7; }
+    .more-data summary { cursor: pointer; color: #2563eb; font-weight: 600; }
+    .more-data[open] summary { margin-bottom: 4px; }
+    /* PID 公式卡：每项一行，代入真实数字，颜色与 P/I/D 对应 */
+    #controlBreakdown { border-left: 3px solid #2563eb; margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
+    #controlBreakdown strong { color: #1f2937; }
+    .formula { display: grid; gap: 3px; margin-top: 4px; }
+    .formula-row { display: flex; align-items: baseline; gap: 7px; }
+    .term { flex: 0 0 20px; height: 20px; line-height: 20px; text-align: center;
+      border-radius: 5px; color: #fff; font-weight: 700; font-size: 12px; }
+    .term-p { background: #2563eb; }
+    .term-i { background: #d97706; }
+    .term-d { background: #059669; }
+    .term-sum { background: #1f2937; }
+    .expr { font-family: Consolas, "Courier New", monospace; font-size: 13px; color: #374151; }
+    .expr b { color: #c2410c; }
+    .expr .res-p { color: #2563eb; font-size: 15px; }
+    .expr .res-i { color: #d97706; font-size: 15px; }
+    .expr .res-d { color: #059669; font-size: 15px; }
+    .expr .res-sum { color: #1f2937; font-size: 15px; }
+    .formula-path { font-size: 12px; color: #475569; font-family: inherit; }
+    .formula-path b { color: #2563eb; }
+    .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+    .chart-head h3 { margin: 0; }
+    .chart-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .chart-tools .btn { margin-top: 0; }
+    .legend { display: flex; gap: 12px; font-size: 12px; color: #6b7280; align-items: center; }
+    .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 4px; vertical-align: middle; border-radius: 2px; background: #2563eb; }
+    .legend .lg-actual::before { background: #f97316; }
+    .legend .lg-target::before { background: #ef4444; }
+    .scrubber-wrap { margin-top: 10px; display: grid; gap: 6px; }
+    .scrubber-label { display: flex; justify-content: space-between; gap: 12px; color: #64748b; font-size: 13px; }
+    .scrubber { width: 100%; accent-color: #2563eb; }
+    .scrubber:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    @media (max-width: 920px) {
+      .container { flex-direction: column; }
+      .left { width: 100%; }
+      .scrubber-label { flex-direction: column; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>调温模型实验</h1>
+  <div class="subtitle" id="loadingTip" title="点击切换下一条提示" aria-live="polite">调参小贴士：先看纯 P 的静差与振荡，再加 I 消静差，最后用 D 做微调</div>
+
+  <div class="container">
+    <div class="panel left">
+      <h3>参数</h3>
+
+      <div class="param">
+        <label for="setPoint">目标温度 (°C)</label>
+        <div class="param-control">
+          <button class="btn param-btn" onclick="adjustParam('setPoint', -1)">-</button>
+          <input type="range" id="setPoint" min="30" max="90" step="1" value="60">
+          <button class="btn param-btn" onclick="adjustParam('setPoint', 1)">+</button>
+        </div>
+        <span class="value" id="setPointVal">60</span>
+      </div>
+
+      <div class="param">
+        <label for="kp">Kp 比例增益</label>
+        <div class="param-control">
+          <button class="btn param-btn" onclick="adjustParam('kp', -1)">-</button>
+          <input type="range" id="kp" min="0" max="200" step="1" value="10">
+          <button class="btn param-btn" onclick="adjustParam('kp', 1)">+</button>
+        </div>
+        <span class="value" id="kpVal">20</span>
+      </div>
+
+      <div class="param">
+        <label for="ki">Ki 积分增益</label>
+        <div class="param-control">
+          <button class="btn param-btn" onclick="adjustParam('ki', -1)">-</button>
+          <input type="range" id="ki" min="0" max="100" step="1" value="0">
+          <button class="btn param-btn" onclick="adjustParam('ki', 1)">+</button>
+        </div>
+        <span class="value" id="kiVal">0</span>
+      </div>
+
+      <div class="param">
+        <label for="kd">Kd 微分增益</label>
+        <div class="param-control">
+          <button class="btn param-btn" onclick="adjustParam('kd', -1)">-</button>
+          <input type="range" id="kd" min="0" max="100" step="1" value="0">
+          <button class="btn param-btn" onclick="adjustParam('kd', 1)">+</button>
+        </div>
+        <span class="value" id="kdVal">0</span>
+      </div>
+
+      <button class="btn btn-auto" onclick="autoTune()">推荐 PI 参数</button>
+      <button class="btn btn-secondary" onclick="resetSystem()">重置实验</button>
+
+      <h3 style="margin-top:18px">实验预设</h3>
+      <button class="btn preset-btn" onclick="loadPreset('pSmall')">P 偏小（加热慢、静差大）</button>
+      <button class="btn preset-btn" onclick="loadPreset('pOk')">P 合适（有静差）</button>
+      <button class="btn preset-btn" onclick="loadPreset('pLarge')">P 偏大（超调振荡）</button>
+      <button class="btn preset-btn" onclick="loadPreset('pi')">PI 合适（静差消失）</button>
+      <button class="btn preset-btn" onclick="loadPreset('iLarge')">I 过大（振荡加剧）</button>
+      <button class="btn preset-btn" onclick="loadPreset('pid')">PID 微调（减小超调）</button>
+
+      <div class="status" id="tuneStatus">当前为手动调参模式</div>
+      <div class="tips">
+        <strong>调参思路</strong><br>
+        温度对象有大热容和 20 s 指令延迟：先从保守的纯 P 开始，观察静差与振荡；再加 Ki 消除静差；最后用 Kd 抑制超调。每次只改一个参数。滑块范围只是本仿真的操作边界，不代表真实设备的整定答案。
+      </div>
+      <details class="more-data">
+        <summary>物理模型（SI 单位，点开查看）</summary>
+        水 2.0 kg，比热容 4186 J/(kg·°C)，热容 8372 J/K。<br>
+        加热器最大 500 W，实际功率 = 500 × 加热管开度 / 100。<br>
+        散热 = (水温 − 20) ÷ 0.15（环境 20 °C、热阻 0.15 K/W）。<br>
+        水温变化率 = (加热功率 − 散热) ÷ 8372。<br>
+        满功率极限 20 + 500×0.15 = 95 °C；60 °C 平衡需 266.7 W（53.3%）。<br>
+        指令延迟 20 s 后到达，加热管按 6 s 一阶惯性动作；测温传感器 25 s 一阶惯性。<br>
+        不含沸腾相变、环境温度漂移与保温层非线性。
+      </details>
+    </div>
+
+    <div class="panel right">
+      <h3>温度响应</h3>
+      <div class="gauge-box" id="gaugeBox">
+        <div class="gauge-track">
+          <span class="scale-tick" style="bottom:0%">0</span>
+          <span class="scale-tick" style="bottom:20%">20</span>
+          <span class="scale-tick" style="bottom:40%">40</span>
+          <span class="scale-tick" style="bottom:60%">60</span>
+          <span class="scale-tick" style="bottom:80%">80</span>
+          <span class="scale-tick" style="bottom:100%">100</span>
+          <div class="actual-line" id="actualLine" aria-hidden="true"></div>
+          <div class="target-line" id="targetLine"><span class="target-tag" id="targetTag">60</span></div>
+          <div class="gauge-cols">
+            <div class="gauge-col" title="实际水温"><div class="bar bar-actual" id="barActual"></div></div>
+            <div class="gauge-col" title="测量温度"><div class="bar bar-measured" id="barMeasured"></div></div>
+          </div>
+        </div>
+        <div class="gauge-labels">
+          <span class="lbl-actual">实际 <b id="barActualVal">20.0</b>°</span>
+          <span class="lbl-measured">测量 <b id="barMeasuredVal">20.0</b>°</span>
+        </div>
+        <div class="lag-tag" id="lagTag">传感器滞后 Δ 0.0 °C</div>
+        <div class="heater" id="heater" aria-hidden="true"></div>
+      </div>
+      <div class="key-metrics">
+        <div class="metric">
+          <span class="metric-label">当前水温</span>
+          <span class="metric-num" id="currentTemp">20.0</span> <span class="metric-unit">°C</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">目标温度</span>
+          <span class="metric-num" id="targetTemp">60.0</span> <span class="metric-unit">°C</span>
+        </div>
+        <div class="metric is-error">
+          <span class="metric-label">误差（目标−测量）</span>
+          <span class="metric-num" id="error">40.00</span> <span class="metric-unit">°C</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">加热管开度</span>
+          <span class="metric-num" id="valve">0</span> <span class="metric-unit">%</span>
+        </div>
+      </div>
+      <div class="status" id="controlBreakdown">
+        <strong>PID 拆解（代入当前值，单位：加热功率 %）</strong>
+        <div class="formula">
+          <div class="formula-row">
+            <span class="term term-p">P</span>
+            <span class="expr">P = Kp × 误差 = <b id="fpKp">20.0</b> × <b id="fpErr">40.000</b> = <span class="res-p" id="pOutput">0.0</span></span>
+          </div>
+          <div class="formula-row">
+            <span class="term term-i">I</span>
+            <span class="expr">I = Ki × 累计误差 = <b id="fpKi">0.00</b> × <b id="fpIacc">—</b> = <span class="res-i" id="iOutput">0.0</span></span>
+          </div>
+          <div class="formula-row">
+            <span class="term term-d">D</span>
+            <span class="expr">D = −Kd × 测量升温速度 = −<b id="fpKd">0</b> × <b id="fpSpeed">0.000</b> = <span class="res-d" id="dOutput">0.0</span></span>
+          </div>
+          <div class="formula-row">
+            <span class="term term-sum">=</span>
+            <span class="expr">输出 = P + I + D = <span class="res-sum" id="rawOutput">0.0</span>
+              → 限幅 [0,100] → <span class="res-sum" id="commandOutput">0.0</span> %</span>
+          </div>
+          <div class="formula-row">
+            <span class="term term-sum">→</span>
+            <span class="formula-path" id="controlChain"></span>
+          </div>
+        </div>
+        <span id="saturationStatus">等待计算</span>
+      </div>
+      <div class="balance-line" id="balanceLine">加热 0.0 W · 散热 0.0 W</div>
+      <details class="more-data">
+        <summary>更多数据（点开查看）</summary>
+        仿真时间 <span class="value" id="simTimeDisplay">0.0</span> s
+        · 水质量 <span class="value" id="massDisplay">2.0</span> kg
+        · 热容 <span class="value" id="capacityDisplay">8372</span> J/K
+        · 理论稳态静差（平衡解预测） <span class="value" id="theoryError">2.50</span> °C
+      </details>
+      <div class="chart-head">
+        <h3>温度曲线（°C）</h3>
+        <div class="chart-tools">
+          <span class="legend">
+            <span>测量温度</span>
+            <span class="lg-actual">实际水温</span>
+            <span class="lg-target">目标</span>
+          </span>
+          <label for="simulationSpeed">仿真倍速</label>
+          <select id="simulationSpeed">
+            <option value="1">1×（真实时间）</option>
+            <option value="50" selected>50×</option>
+            <option value="100">100×</option>
+          </select>
+          <button class="btn btn-secondary" id="toggleRunBtn" type="button">暂停</button>
+        </div>
+      </div>
+      <canvas id="chart"></canvas>
+      <div class="scrubber-wrap">
+        <div class="scrubber-label">
+          <span id="scrubberState">运行中：显示最新曲线</span>
+          <span id="scrubberRange">0.0s - 0.0s</span>
+        </div>
+        <input class="scrubber" id="historyScrubber" type="range" min="0" max="0" value="0" disabled>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tips = [
+      "先看纯 P：Kp 偏小加热慢、静差大；偏大会超调并来回振荡。",
+      "实测 Kp=4：静差 10.0 °C，到 45 °C 要 634.5 s——比例太弱，加热跟不上散热。",
+      "实测 Kp=20（默认）：稳态 57.5 °C、静差 2.50 °C，加热 250 W = 散热 250 W。",
+      "实测 Kp=100：超调 0.63 °C 后来回振荡，振幅 2.08 °C、周期 92 s——纯 P 太大就会振。",
+      "纯 P 必须留静差才能维持功率；Ki 记住所需功率，把静差消掉，这就是它的“记忆”。",
+      "同 Kp=50：Ki=0.3 静差消失、几乎无超调；Ki=1 振荡加剧（振幅 2.62 °C、周期 122 s）。",
+      "I 太大容易让温度振荡加剧：积分记忆太强，修正过头就反向再来一遍。",
+      "D 用于微调：同 Kp=70、Ki=0.3，Kd 0→1500 实测超调 0.81→0.00 °C、振幅 1.83→0.00 °C。",
+      "本模型 20 s 指令延迟 + 6 s 加热管惯性 + 25 s 测温惯性，是 P 太大会振的根源。",
+      "调参时一次只改一个参数，并观察曲线的超调量与振荡周期。",
+      "积分项会累积历史误差；加热管已满负荷（积分饱和）时，退出饱和需要额外时间。",
+      "「推荐 PI 参数」只是预设，不是在线自动辨识或自动整定。",
+      "预测稳态静差是平衡解，不是当前误差；加 I 后预测为零仍需等待收敛。",
+      "右侧「PID 拆解」公式卡实时显示每个数怎么来的，调参时盯着它看最直观。",
+      "暂停后可回看温度曲线；上方读数仍显示当前状态，不是历史读数。"
+    ];
+    let tipIndex = 0;
+    const tipElement = document.getElementById("loadingTip");
+    function showNextTip() {
+      tipElement.classList.add("is-changing");
+      window.setTimeout(() => {
+        tipIndex = (tipIndex + 1) % tips.length;
+        tipElement.textContent = `调参小贴士：${tips[tipIndex]}`;
+        tipElement.classList.remove("is-changing");
+      }, 250);
+    }
+    tipElement.addEventListener("click", showNextTip);
+    window.setInterval(showNextTip, 6000);
+
+    let setPoint = 60;
+    let kp = 20.0;
+    let ki = 0.0;
+    let kd = 0.0;
+    // 三个滑块统一显示 0–100 的控制比例；仿真仍使用各自的物理参数范围。
+    const kpScale = 2;    // 比例 100 → 内部 Kp 200
+    const kiScale = 0.05; // 比例 100 → 内部 Ki 5
+    const kdScale = 30;   // 比例 100 → 内部 Kd 3000
+
+    let currentTemp = 20.0;   // 实际水温
+    let measuredTemp = 20.0;  // 传感器测量温度（控制器只看这个）
+    let integral = 0.0;
+    let valveOpen = 0.0;      // 限幅后的加热指令 %
+    let actuator = 0.0;       // 实际加热管功率 %
+    let peakTemp = 20.0;      // 本次运行的最高水温，用于算超调
+    // 本步 PID 计算的拆解结果，供界面展示“这个数是怎么来的”
+    let controlOutput = { p: 0, i: 0, d: 0, raw: 0, integrating: false };
+
+    // 物理计算使用 kg、s、J、°C；界面把功率显示为 W 与 %。
+    const dt = 0.1;               // 固定物理步长，不随显示帧率或倍速变化
+    const ambientTemp = 20;       // 环境温度 °C
+    const heaterMaxPower = 500;   // 加热管最大功率 W
+    const waterMass = 2.0;        // 水质量 kg
+    const specificHeat = 4186;    // 水比热容 J/(kg·°C)
+    const heatCapacity = waterMass * specificHeat; // 8372 J/K
+    const thermalResistance = 0.15;      // 热阻 K/W
+    const heaterTimeConstant = 6;        // 加热管一阶惯性 s
+    const sensorTimeConstant = 25;       // 测温传感器一阶惯性 s
+    const controlDelay = 20;             // 控制指令纯滞后 s
+    const delaySteps = Math.round(controlDelay / dt);
+    const maxValve = 100;
+    const derivativeTimeConstant = 4;    // 测量微分低通时间常数 s
+    const historyInterval = 1;           // 每个仿真秒保存一个温度点
+    const historySteps = Math.round(historyInterval / dt);
+    const visiblePoints = 601;           // 显示最近 10 分钟
+    const maxStoredPoints = 7201;
+    let simulationSteps = 0;
+    let simulationSpeed = 50;
+    let accumulator = 0;
+    let lastFrameTime = null;
+
+    let lastMeasurement = 20.0;
+    let filteredDerivative = 0.0;
+
+    let delayQueue = new Array(delaySteps).fill(0);
+    let history = [{ time: 0, temp: 20, measured: 20 }];
+    let isPaused = false;
+    let viewStartIndex = 0;
+
+    const gaugeBoxEl = document.getElementById("gaugeBox");
+    const targetLineEl = document.getElementById("targetLine");
+    const targetTagEl = document.getElementById("targetTag");
+    const actualLineEl = document.getElementById("actualLine");
+    const actualBarEl = document.getElementById("barActual");
+    const measuredBarEl = document.getElementById("barMeasured");
+    const barActualValEl = document.getElementById("barActualVal");
+    const barMeasuredValEl = document.getElementById("barMeasuredVal");
+    const lagTagEl = document.getElementById("lagTag");
+    const heaterEl = document.getElementById("heater");
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+    const toggleRunBtn = document.getElementById("toggleRunBtn");
+    const historyScrubber = document.getElementById("historyScrubber");
+    const scrubberStateEl = document.getElementById("scrubberState");
+    const scrubberRangeEl = document.getElementById("scrubberRange");
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawChart();
+    }
+
+    function roundToStep(v, step) {
+      return Math.round(v / step) * step;
+    }
+
+    function syncUI() {
+      document.getElementById("setPoint").value = setPoint;
+      document.getElementById("setPointVal").textContent = setPoint.toFixed(0);
+      document.getElementById("kp").value = kp / kpScale;
+      document.getElementById("kpVal").textContent = Math.round(kp / kpScale);
+      document.getElementById("ki").value = ki / kiScale;
+      document.getElementById("kiVal").textContent = Math.round(ki / kiScale);
+      document.getElementById("kd").value = kd / kdScale;
+      document.getElementById("kdVal").textContent = Math.round(kd / kdScale);
+      updateTargetLine();
+      updateReadout();
+      drawChart();
+    }
+
+    function adjustParam(name, delta) {
+      const input = document.getElementById(name);
+      const step = parseFloat(input.step) || 0.1;
+      let value = roundToStep(parseFloat(input.value) + delta, step);
+      value = Math.max(parseFloat(input.min), Math.min(parseFloat(input.max), value));
+
+      if (name === "setPoint") setPoint = value;
+      if (name === "kp") kp = value * kpScale;
+      if (name === "ki") ki = value * kiScale;
+      if (name === "kd") kd = value * kdScale;
+
+      // 微调同样不重启系统，参数即时生效
+      syncUI();
+    }
+
+    function loadPreset(name) {
+      if (name === "pSmall") {
+        kp = 4.0; ki = 0.0; kd = 0.0;
+        document.getElementById("tuneStatus").textContent =
+          "P 偏小（Kp=4）。预期：加热很慢，到 45 °C 要 634.5 s，最终停在 50.0 °C——静差高达 10.0 °C，比例太弱压不住散热";
+      }
+      if (name === "pOk") {
+        kp = 20.0; ki = 0.0; kd = 0.0;
+        document.getElementById("tuneStatus").textContent =
+          "P 合适（Kp=20，默认）。预期：稳态 57.5 °C、静差 2.50 °C，无振荡——纯 P 永远要留一点误差（加热 250 W = 散热 250 W）";
+      }
+      if (name === "pLarge") {
+        kp = 100.0; ki = 0.0; kd = 0.0;
+        document.getElementById("tuneStatus").textContent =
+          "P 偏大（Kp=100）。预期：超调 0.63 °C 后来回振荡，实测振幅 2.08 °C、周期 92 s——延迟+热惯性让大 P 失稳";
+      }
+      if (name === "pi") {
+        kp = 50.0; ki = 0.3; kd = 0.0;
+        document.getElementById("tuneStatus").textContent =
+          "PI 合适（Kp=50、Ki=0.3）。预期：静差消失、贴住目标线，超调仅 0.40 °C——盯住公式卡里 I 项的累积";
+      }
+      if (name === "iLarge") {
+        kp = 50.0; ki = 1.0; kd = 0.0;
+        document.getElementById("tuneStatus").textContent =
+          "I 过大（Kp=50、Ki=1）。预期：积分记忆太强，振荡比 Ki=0.3 明显加剧——实测振幅 2.62 °C、周期 122 s";
+      }
+      if (name === "pid") {
+        kp = 70.0; ki = 0.3; kd = 1500.0;
+        document.getElementById("tuneStatus").textContent =
+          "PID 微调（Kp=70、Ki=0.3、Kd=1500）。预期：D 抑制升温冲刺，超调 0.00 °C；同参数去掉 D 实测超调 0.81 °C、振幅 1.83 °C";
+      }
+
+      // 预设从 20 °C 冷态重新开始，便于比较同一目标下的不同控制方式。
+      syncUI();
+      resetSimState();
+    }
+
+    function autoTune() {
+      loadPreset("pi");
+      document.getElementById("tuneStatus").textContent = "已加载当前物理模型的推荐 PI：Kp=50、Ki=0.3、Kd=0（预设，非自动整定）";
+    }
+
+    function resetSimState() {
+      currentTemp = ambientTemp;
+      measuredTemp = ambientTemp;
+      integral = 0.0;
+      lastMeasurement = ambientTemp;
+      filteredDerivative = 0.0;
+      valveOpen = 0.0;
+      actuator = 0.0;
+      peakTemp = ambientTemp;
+      controlOutput = { p: 0, i: 0, d: 0, raw: 0, integrating: false };
+      delayQueue = new Array(delaySteps).fill(0);
+      simulationSteps = 0;
+      accumulator = 0;
+      lastFrameTime = null;
+      history = [{ time: 0, temp: ambientTemp, measured: ambientTemp }];
+      isPaused = false;
+      viewStartIndex = 0;
+      updateReadout();
+      updateScrubberUI();
+      drawChart();
+    }
+
+    function resetSystem() {
+      setPoint = 60;
+      kp = 20.0;
+      ki = 0.0;
+      kd = 0.0;
+      syncUI();
+      resetSimState();
+      document.getElementById("tuneStatus").textContent = "已重置：所有参数恢复默认值，系统从 20 °C 冷态重新开始";
+    }
+
+    function updateTargetLine() {
+      // 刻度范围 0–100 °C，目标线按比例摆放
+      targetLineEl.style.bottom = setPoint + "%";
+      targetTagEl.textContent = setPoint.toFixed(0);
+    }
+
+    // 调参不重启系统：参数改动即时生效，系统从当前状态继续响应，便于观察过渡过程
+    document.getElementById("setPoint").oninput = function () {
+      setPoint = parseFloat(this.value);
+      syncUI();
+    };
+
+    document.getElementById("kp").oninput = function () {
+      kp = parseFloat(this.value) * kpScale;
+      syncUI();
+    };
+
+    document.getElementById("ki").oninput = function () {
+      ki = parseFloat(this.value) * kiScale;
+      syncUI();
+    };
+
+    document.getElementById("kd").oninput = function () {
+      kd = parseFloat(this.value) * kdScale;
+      syncUI();
+    };
+
+    toggleRunBtn.addEventListener("click", function () {
+      isPaused = !isPaused;
+      lastFrameTime = null;
+      if (!isPaused) {
+        viewStartIndex = getLatestViewStart();
+      }
+      updateScrubberUI();
+      drawChart();
+    });
+
+    document.getElementById("simulationSpeed").addEventListener("change", function () {
+      simulationSpeed = Number(this.value);
+      lastFrameTime = null;
+    });
+
+    // 后台页面停止推进仿真，避免回到页面时突然补算很长时间。
+    document.addEventListener("visibilitychange", function () {
+      lastFrameTime = null;
+    });
+
+    historyScrubber.addEventListener("input", function () {
+      viewStartIndex = parseInt(this.value, 10) || 0;
+      updateScrubberUI();
+      drawChart();
+    });
+
+    function getLatestViewStart() {
+      return Math.max(0, history.length - visiblePoints);
+    }
+
+    function formatTime(index) {
+      return (history[index]?.time || 0).toFixed(1) + "s";
+    }
+
+    function updateScrubberUI() {
+      const maxStart = getLatestViewStart();
+      if (!isPaused) {
+        viewStartIndex = maxStart;
+      } else {
+        viewStartIndex = Math.max(0, Math.min(viewStartIndex, maxStart));
+      }
+
+      historyScrubber.max = String(maxStart);
+      historyScrubber.value = String(viewStartIndex);
+      historyScrubber.disabled = !isPaused || maxStart === 0;
+      toggleRunBtn.textContent = isPaused ? "启动" : "暂停";
+      scrubberStateEl.textContent = isPaused ? "已暂停：可拖动滑块回看" : "运行中：显示最新曲线";
+
+      if (history.length === 0) {
+        scrubberRangeEl.textContent = "0.0s - 0.0s";
+        return;
+      }
+
+      const endIndex = Math.min(history.length, viewStartIndex + visiblePoints);
+      scrubberRangeEl.textContent = formatTime(viewStartIndex) + " - " + formatTime(endIndex - 1);
+    }
+    function updateReadout() {
+      const error = setPoint - measuredTemp;
+      // 双柱刻度条：橙柱 = 实际水温，蓝柱 = 测量温度（控制器所见），两柱顶差即传感器滞后
+      const actualPercent = Math.max(0, Math.min(100, currentTemp));
+      const measuredPercent = Math.max(0, Math.min(100, measuredTemp));
+      actualBarEl.style.height = actualPercent + "%";
+      measuredBarEl.style.height = measuredPercent + "%";
+      actualLineEl.style.bottom = actualPercent + "%";
+      barActualValEl.textContent = currentTemp.toFixed(1);
+      barMeasuredValEl.textContent = measuredTemp.toFixed(1);
+      lagTagEl.textContent = `传感器滞后 Δ ${(currentTemp - measuredTemp).toFixed(1)} °C`;
+      // 加热管红热程度跟随实际功率
+      const powerRatio = actuator / maxValve;
+      heaterEl.style.background = `repeating-linear-gradient(90deg, hsl(0 ${30 + 60 * powerRatio}% ${18 + 24 * powerRatio}%) 0 10px, hsl(0 ${45 + 50 * powerRatio}% ${26 + 30 * powerRatio}%) 10px 20px)`;
+      heaterEl.style.boxShadow = powerRatio > 0.02 ? `0 0 ${8 + 18 * powerRatio}px rgba(239,68,68,${0.25 + 0.55 * powerRatio})` : "none";
+
+      document.getElementById("currentTemp").textContent = currentTemp.toFixed(1);
+      document.getElementById("targetTemp").textContent = setPoint.toFixed(1);
+      document.getElementById("valve").textContent = Math.round(actuator);
+      document.getElementById("error").textContent = error.toFixed(2);
+      document.getElementById("simTimeDisplay").textContent = (simulationSteps * dt).toFixed(1);
+      document.getElementById("massDisplay").textContent = waterMass.toFixed(1);
+      document.getElementById("capacityDisplay").textContent = heatCapacity.toFixed(0);
+
+      // PID 拆解：把“误差 → 各项 → 指令 → 实际功率”这串数字直接显示出来
+      const out = controlOutput;
+      document.getElementById("pOutput").textContent = out.p.toFixed(1);
+      document.getElementById("iOutput").textContent = out.i.toFixed(1);
+      document.getElementById("dOutput").textContent = out.d.toFixed(1);
+      document.getElementById("rawOutput").textContent = out.raw.toFixed(1);
+      document.getElementById("commandOutput").textContent = valveOpen.toFixed(1);
+      // 公式卡：把当前误差、参数、升温速度代入原始式子
+      document.getElementById("fpErr").textContent = error.toFixed(3);
+      document.getElementById("fpKp").textContent = kp.toFixed(1);
+      document.getElementById("fpKi").textContent = ki.toFixed(2);
+      document.getElementById("fpIacc").textContent = ki > 0 ? (integral / ki).toFixed(2) : "—";
+      document.getElementById("fpKd").textContent = kd.toFixed(0);
+      document.getElementById("fpSpeed").textContent = filteredDerivative.toFixed(3);
+      const saturation = out.raw > maxValve ? "上限饱和：原始输出超过 100%，加热管按 100% 全功率"
+        : out.raw < 0 ? "下限饱和：原始输出为负，加热管关闭（不能制冷）" : "未饱和";
+      const integration = ki === 0 ? "Ki=0，积分关闭"
+        : out.integrating ? "积分正在累积" : "抗饱和：输出已在边界，暂停向饱和方向累积";
+      document.getElementById("saturationStatus").textContent = saturation + "；" + integration;
+      document.getElementById("controlChain").textContent =
+        `计算链：限幅指令 ${valveOpen.toFixed(1)}% 经 ${controlDelay.toFixed(0)} s 延迟与 ${heaterTimeConstant.toFixed(0)} s 加热管惯性`
+        + ` → 实际功率 ${Math.round(actuator)}%`;
+
+      // 加热与散热的平衡是理解闭环稳态的关键：加热≈散热时温度不再变化
+      const heatIn = heaterMaxPower * actuator / 100;
+      const heatOut = heatLoss(currentTemp);
+      const netW = heatIn - heatOut;
+      const balanceState = Math.abs(netW) < 1 ? "加热=散热，温度稳定"
+        : netW > 0 ? `净加热 ${netW.toFixed(1)} W，温度上升`
+          : `净散热 ${(-netW).toFixed(1)} W，温度下降`;
+      document.getElementById("balanceLine").textContent =
+        `加热 ${heatIn.toFixed(1)} W · 散热 ${heatOut.toFixed(1)} W · ${balanceState}`;
+
+      // 仅为平衡解预测，不承诺不稳定参数能够收敛。
+      document.getElementById("theoryError").textContent = steadyStateError().toFixed(2);
+    }
+
+    function heatLoss(temp) {
+      return Math.max(0, temp - ambientTemp) / thermalResistance;
+    }
+
+    function steadyStateError() {
+      if (ki > 0) {
+        // 积分能保持所需功率；若满功率仍不够，只能达到 95 °C 的极限平衡温度。
+        const maxTemp = ambientTemp + heaterMaxPower * thermalResistance;
+        return Math.max(0, setPoint - maxTemp);
+      }
+      // 纯 P：求 500 × clamp(Kp×(目标−T),0,100)/100 = heatLoss(T)。
+      let low = ambientTemp;
+      let high = ambientTemp + heaterMaxPower * thermalResistance + 40;
+      for (let i = 0; i < 60; i++) {
+        const temp = (low + high) / 2;
+        const command = Math.max(0, Math.min(maxValve, kp * (setPoint - temp)));
+        if (heaterMaxPower * command / maxValve > heatLoss(temp)) low = temp;
+        else high = temp;
+      }
+      return setPoint - (low + high) / 2;
+    }
+
+    function pidControl() {
+      // 控制器只看测量温度；微分也作用在测量值上
+      const error = setPoint - measuredTemp;
+      const measurementDerivative = (measuredTemp - lastMeasurement) / dt;
+      const derivativeAlpha = 1 - Math.exp(-dt / derivativeTimeConstant);
+      filteredDerivative += derivativeAlpha * (measurementDerivative - filteredDerivative);
+
+      // integral 直接存积分输出（%）。条件积分：饱和时不继续向饱和方向累积。
+      const candidateIntegral = integral + ki * error * dt;
+      const candidateCommand = kp * error + candidateIntegral - kd * filteredDerivative;
+      let integrating = false;
+      if (ki === 0) integral = 0;
+      else if ((candidateCommand >= 0 && candidateCommand <= maxValve)
+        || (candidateCommand > maxValve && error < 0)
+        || (candidateCommand < 0 && error > 0)) {
+        integral = candidateIntegral;
+        integrating = true;
+      }
+
+      const command = kp * error + integral - kd * filteredDerivative;
+      valveOpen = Math.max(0, Math.min(maxValve, command));
+      controlOutput = { p: kp * error, i: integral, d: -kd * filteredDerivative,
+        raw: command, integrating };
+      // 必须在传感器更新之前记录本次测量，否则微分恒为 0
+      lastMeasurement = measuredTemp;
+
+      delayQueue.push(valveOpen);
+      const delayedCommand = delayQueue.shift();
+
+      actuator += (1 - Math.exp(-dt / heaterTimeConstant)) * (delayedCommand - actuator);
+      const heatIn = heaterMaxPower * actuator / 100;
+      currentTemp += (heatIn - heatLoss(currentTemp)) / heatCapacity * dt;
+      // 测温传感器一阶惯性：测量值追不上实际水温
+      measuredTemp += (1 - Math.exp(-dt / sensorTimeConstant)) * (currentTemp - measuredTemp);
+      if (currentTemp > peakTemp) peakTemp = currentTemp;
+      simulationSteps++;
+
+      if (simulationSteps % historySteps === 0) {
+        history.push({ time: simulationSteps * dt, temp: currentTemp, measured: measuredTemp });
+        if (history.length > maxStoredPoints) history.shift();
+      }
+    }
+
+    function drawChart() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      const start = isPaused ? viewStartIndex : getLatestViewStart();
+      const end = Math.min(history.length, start + visiblePoints);
+
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 5; i++) {
+        const gy = (h / 5) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        ctx.lineTo(w, gy);
+        ctx.stroke();
+      }
+
+      // 目标线（红）
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const ty = h - setPoint / 100 * h;
+      ctx.moveTo(0, ty);
+      ctx.lineTo(w, ty);
+      ctx.stroke();
+
+      // 实际水温（橙虚线）：看得见传感器滞后
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = "#f97316";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = start; i < end; i++) {
+        const point = history[i];
+        if (point == null) continue;
+        const progress = end - start <= 1 ? 0 : (i - start) / (end - start - 1);
+        const x = progress * w;
+        const y = h - point.temp / 100 * h;
+        if (i === start) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 测量温度（蓝实线，控制器输入）
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = start; i < end; i++) {
+        const point = history[i];
+        if (point == null) continue;
+        const progress = end - start <= 1 ? 0 : (i - start) / (end - start - 1);
+        const x = progress * w;
+        const y = h - point.measured / 100 * h;
+        if (i === start) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function loop(timestamp) {
+      if (lastFrameTime !== null && !isPaused && !document.hidden) {
+        accumulator += (timestamp - lastFrameTime) / 1000 * simulationSpeed;
+        // 固定步长推进，渲染只做一次。积压保留到后续帧，不把大步长传入物理模型。
+        let steps = 0;
+        while (accumulator >= dt && steps < 2400) {
+          pidControl();
+          accumulator -= dt;
+          steps++;
+        }
+      }
+      lastFrameTime = timestamp;
+      updateReadout();
+      updateScrubberUI();
+      drawChart();
+      requestAnimationFrame(loop);
+    }
+
+    syncUI();
+    updateReadout();
+    updateScrubberUI();
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
