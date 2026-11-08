@@ -113,4 +113,3 @@
         if (history.length > maxStoredPoints) history.shift();
       }
     }
-
