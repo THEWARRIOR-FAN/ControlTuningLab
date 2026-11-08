@@ -1,7 +1,7 @@
-# EmbeddedWebControlExperiments
+# ControlTuningLab
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-brightgreen)](https://thewarrior-fan.github.io/EmbeddedWebControlExperiments/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-brightgreen)](https://thewarrior-fan.github.io/ControlTuningLab/)
 
 基于网页技术的控制系统仿真实验集合：用可交互的界面直观理解不同控制模型的工作原理与参数调节方法。
 
@@ -9,7 +9,7 @@
 
 ## 在线演示
 
-<https://thewarrior-fan.github.io/EmbeddedWebControlExperiments/>
+<https://thewarrior-fan.github.io/ControlTuningLab/>
 
 由 GitHub Pages 在每次推送 `main` 分支后自动部署。
 
