@@ -123,7 +123,8 @@ test('preset status explains expected phenomenon for learners', () => {
   assert.ok(run('document.getElementById("tuneStatus").textContent').includes('D 项'));
 });
 
-test('simulation speed offers fast 50x and 100x options', () => {
+test('simulation speed offers 10x, 50x and 100x options', () => {
+  assert.match(html, /<option value="10">10×<\/option>/);
   assert.match(html, /<option value="50" selected>50×<\/option>/);
   assert.match(html, /<option value="100">100×<\/option>/);
 });

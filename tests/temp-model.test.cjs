@@ -240,6 +240,7 @@ test('history keeps absolute simulated timestamps after trimming', () => {
 });
 
 test('speed options and slider ranges match the calibration targets', () => {
+  assert.match(html, /<option value="10">10×<\/option>/);
   assert.match(html, /<option value="50" selected>50×<\/option>/);
   assert.match(html, /<option value="100">100×<\/option>/);
   // 滑块范围只是本教学模型的操作边界，不代表真实设备的整定答案
