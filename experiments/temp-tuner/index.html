@@ -10,11 +10,8 @@
        锅底火光跟随功率），锅下温度条填充 = 水温，贴住红色目标刻度变绿、蓝刻度为测量温度
        （布局、控件、公式卡等共享样式见 core/theme.css） */
     .gauge-box { position: relative; width: 100%; height: 300px; border: 1px solid #d1d5db; border-radius: 12px; margin: 14px 0 16px; background: #fff; overflow: hidden; }
-    /* 锅区：顶部 34px 留给蒸汽，底部 96px 接加热管与温度条 */
-    .gauge-track { position: absolute; left: 10px; right: 10px; top: 34px; bottom: 96px;
-      background: repeating-linear-gradient(to top, #eef2f7 0 1px, transparent 1px 20%); }
-    /* 刻度：左侧 0–100 °C 标注，与 20% 网格线对齐 */
-    .scale-tick { position: absolute; left: 2px; font-size: 10px; color: #94a3b8; transform: translateY(50%); }
+    /* 锅区：顶部 34px 留给蒸汽，底部 96px 接加热管与温度条（0–100 °C 刻度在下方曲线纵轴） */
+    .gauge-track { position: absolute; left: 10px; right: 10px; top: 34px; bottom: 96px; }
     /* 锅内参考线（只跨锅体，不横穿整框）：目标温度线（红，实线，样式在 core/theme.css）与实际水温线（橙，虚线） */
     .target-tag { position: absolute; right: 6px; top: -9px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
     .actual-line { position: absolute; left: 0; width: 100%; height: 0; border-top: 2px dashed #f97316; z-index: 9; }
@@ -183,12 +180,6 @@
       <h3>温度响应</h3>
       <div class="gauge-box" id="gaugeBox">
         <div class="gauge-track">
-          <span class="scale-tick" style="bottom:0%">0</span>
-          <span class="scale-tick" style="bottom:20%">20</span>
-          <span class="scale-tick" style="bottom:40%">40</span>
-          <span class="scale-tick" style="bottom:60%">60</span>
-          <span class="scale-tick" style="bottom:80%">80</span>
-          <span class="scale-tick" style="bottom:100%">100</span>
           <div class="pot" id="pot" title="锅内水量固定；红/橙线为目标/实际水温高度，气泡随温度增多">
             <div class="pot-water" id="potWater">
               <span class="bubble" style="left:20%"></span>

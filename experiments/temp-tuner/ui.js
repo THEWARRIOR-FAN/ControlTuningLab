@@ -268,6 +268,7 @@
       renderChart(canvas, ctx, {
         max: 100,
         target: setPoint,
+        yTicks: [0, 20, 40, 60, 80, 100],   // 纵轴刻度：0–100 °C，与 5 等分网格对齐
         series: [
           { value: point => point.temp, color: "#f97316", width: 1.5, dash: [6, 4] },
           { value: point => point.measured, color: "#2563eb", width: 2 }
