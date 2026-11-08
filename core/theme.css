@@ -1,0 +1,77 @@
+/* 共享主题：两个实验页共用的布局、控件、指标、公式卡与曲线工具样式。
+   实验专属的可视化（水池 / 温度刻度条）仍写在各页自己的 <style> 里。 */
+* { box-sizing: border-box; font-family: Arial, sans-serif; }
+body { background: #f5f7fb; max-width: 1120px; margin: 0 auto; padding: 20px; color: #1f2937; }
+h1 { text-align: center; margin: 0 0 8px; }
+.subtitle { text-align: center; color: #6b7280; margin-bottom: 16px; min-height: 1.5em; transition: opacity .25s ease; cursor: pointer; user-select: none; }
+.subtitle:hover { color: #2563eb; }
+.subtitle.is-changing { opacity: 0; }
+.container { display: flex; gap: 18px; align-items: flex-start; }
+.panel { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(15,23,42,.08); }
+.left { width: 330px; }
+.right { flex: 1; }
+h3 { margin: 0 0 12px; }
+.param { margin: 14px 0; }
+label { display: block; font-weight: 700; margin-bottom: 6px; color: #374151; }
+input[type="range"] { width: 100%; }
+.param-control { display: flex; align-items: center; gap: 8px; }
+.value { color: #2563eb; font-weight: 700; min-width: 56px; display: inline-block; text-align: right; }
+.btn { padding: 8px 12px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+.btn:hover { background: #1d4ed8; }
+.btn-auto { background: #16a34a; }
+.btn-auto:hover { background: #15803d; }
+.btn-secondary { background: #6b7280; }
+.btn-secondary:hover { background: #4b5563; }
+.param-btn { width: 34px; height: 34px; padding: 0; margin-top: 0; flex: 0 0 34px; }
+.preset-btn { width: 100%; }
+.status, .tips { line-height: 1.7; font-size: 14px; }
+/* 目标线：两个实验的可视化里都有的红色参考线 */
+.target-line { position: absolute; left: 0; width: 100%; height: 3px; background: #ef4444; z-index: 10; }
+canvas { width: 100%; height: 260px; border: 1px solid #d1d5db; background: #fafafa; display: block; }
+.status, .tips { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e5e7eb; }
+.tips { color: #475569; }
+/* 核心指标：四个关键量并排放大显示 */
+.key-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
+.metric { min-width: 0; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 5px; text-align: center; }
+.metric-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #6b7280; margin-bottom: 2px; }
+.metric-num { font-size: 21px; font-weight: 700; color: #1f2937; }
+.metric-unit { font-size: 12px; color: #6b7280; }
+.metric.is-error .metric-num { color: #dc2626; }
+.balance-line { margin-top: 8px; font-size: 14px; color: #374151; }
+/* 次要数据默认折叠，点开才显示 */
+.more-data { margin-top: 8px; font-size: 13px; color: #475569; line-height: 1.7; }
+.more-data summary { cursor: pointer; color: #2563eb; font-weight: 600; }
+.more-data[open] summary { margin-bottom: 4px; }
+/* PID 公式卡：每项一行，代入真实数字，颜色与 P/I/D 对应 */
+#controlBreakdown { border-left: 3px solid #2563eb; margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
+#controlBreakdown strong { color: #1f2937; }
+.formula { display: grid; gap: 3px; margin-top: 4px; }
+.formula-row { display: flex; align-items: baseline; gap: 7px; }
+.term { flex: 0 0 20px; height: 20px; line-height: 20px; text-align: center;
+  border-radius: 5px; color: #fff; font-weight: 700; font-size: 12px; }
+.term-p { background: #2563eb; }
+.term-i { background: #d97706; }
+.term-d { background: #059669; }
+.term-sum { background: #1f2937; }
+.expr { font-family: Consolas, "Courier New", monospace; font-size: 13px; color: #374151; }
+.expr b { color: #c2410c; }
+.expr .res-p { color: #2563eb; font-size: 15px; }
+.expr .res-i { color: #d97706; font-size: 15px; }
+.expr .res-d { color: #059669; font-size: 15px; }
+.expr .res-sum { color: #1f2937; font-size: 15px; }
+.formula-path { font-size: 12px; color: #475569; font-family: inherit; }
+.formula-path b { color: #2563eb; }
+.chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.chart-head h3 { margin: 0; }
+.chart-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chart-tools .btn { margin-top: 0; }
+.scrubber-wrap { margin-top: 10px; display: grid; gap: 6px; }
+.scrubber-label { display: flex; justify-content: space-between; gap: 12px; color: #64748b; font-size: 13px; }
+.scrubber { width: 100%; accent-color: #2563eb; }
+.scrubber:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 920px) {
+  .container { flex-direction: column; }
+  .left { width: 100%; }
+  .scrubber-label { flex-direction: column; gap: 2px; }
+}

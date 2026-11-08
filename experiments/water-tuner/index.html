@@ -4,38 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>水位调参实验</title>
+  <link rel="stylesheet" href="../../core/theme.css">
   <style>
-    * { box-sizing: border-box; font-family: Arial, sans-serif; }
-    body { background: #f5f7fb; max-width: 1120px; margin: 0 auto; padding: 20px; color: #1f2937; }
-    h1 { text-align: center; margin: 0 0 8px; }
-    .subtitle { text-align: center; color: #6b7280; margin-bottom: 16px; min-height: 1.5em; transition: opacity .25s ease; cursor: pointer; user-select: none; }
-    .subtitle:hover { color: #2563eb; }
-    .subtitle.is-changing { opacity: 0; }
-    .container { display: flex; gap: 18px; align-items: flex-start; }
-    .panel { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(15,23,42,.08); }
-    .left { width: 330px; }
-    .right { flex: 1; }
-    h3 { margin: 0 0 12px; }
-    .param { margin: 14px 0; }
-    label { display: block; font-weight: 700; margin-bottom: 6px; color: #374151; }
-    input[type="range"] { width: 100%; }
-    .param-control { display: flex; align-items: center; gap: 8px; }
-    .value { color: #2563eb; font-weight: 700; min-width: 56px; display: inline-block; text-align: right; }
-    .btn { padding: 8px 12px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; cursor: pointer; margin-top: 10px; }
-    .btn:hover { background: #1d4ed8; }
-    .btn-auto { background: #16a34a; }
-    .btn-auto:hover { background: #15803d; }
-    .btn-secondary { background: #6b7280; }
-    .btn-secondary:hover { background: #4b5563; }
-    .param-btn { width: 34px; height: 34px; padding: 0; margin-top: 0; flex: 0 0 34px; }
-    .preset-btn { width: 100%; }
-    .status, .tips { line-height: 1.7; font-size: 14px; }
+    /* 水池可视化专属样式（布局、控件、公式卡等共享样式见 core/theme.css） */
     .pool-box { position: relative; width: 100%; height: 300px; border: 3px solid #6b7280; border-bottom: none; margin: 14px 0 52px; background: #fff; overflow: visible; }
     .water { position: absolute; bottom: 0; width: 100%; background: linear-gradient(180deg, #60a5fa, #2563eb); overflow: hidden; transition: height .08s linear; }
     .water::before { content: ""; position: absolute; left: 0; top: 0; width: 200%; height: 10px; background: repeating-linear-gradient(110deg, rgba(255,255,255,.5) 0 18px, rgba(255,255,255,0) 18px 44px); animation: surfaceFlow 2.8s linear infinite; }
     .water::after { content: ""; position: absolute; left: 0; top: 8px; width: 200%; height: 8px; background: repeating-linear-gradient(70deg, rgba(255,255,255,.18) 0 14px, rgba(255,255,255,0) 14px 38px); animation: surfaceFlow 4.2s linear infinite reverse; }
     .water:not(.has-water)::before, .water:not(.has-water)::after { opacity: 0; }
-    .target-line { position: absolute; left: 0; width: 100%; height: 3px; background: #ef4444; z-index: 10; }
     /* 进水管与下落水流 */
     .inlet-pipe { position: absolute; left: 26px; top: -18px; width: 20px; height: 34px; border-radius: 3px; background: linear-gradient(90deg, #94a3b8, #64748b); box-shadow: inset 0 2px 0 rgba(255,255,255,.45); z-index: 20; }
     .inlet-pipe::after { content: ""; position: absolute; left: 3px; bottom: -5px; width: 14px; height: 7px; border-radius: 0 0 4px 4px; background: #475569; }
@@ -58,54 +34,6 @@
     .pool-box.is-paused .inlet-stream::before, .pool-box.is-paused .inlet-stream::after,
     .pool-box.is-paused .outlet-stream::before, .pool-box.is-paused .drain-pool.is-receiving::before { animation-play-state: paused; }
     @media (prefers-reduced-motion: reduce) { .water::before, .water::after, .inlet-stream::before, .inlet-stream::after, .outlet-stream::before, .drain-pool.is-receiving::before { animation: none; } }
-    canvas { width: 100%; height: 260px; border: 1px solid #d1d5db; background: #fafafa; display: block; }
-    .status, .tips { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e5e7eb; }
-    .tips { color: #475569; }
-    /* 核心指标：四个关键量并排放大显示 */
-    .key-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
-    .metric { min-width: 0; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 5px; text-align: center; }
-    .metric-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #6b7280; margin-bottom: 2px; }
-    .metric-num { font-size: 21px; font-weight: 700; color: #1f2937; }
-    .metric-unit { font-size: 12px; color: #6b7280; }
-    .metric.is-error .metric-num { color: #dc2626; }
-    .balance-line { margin-top: 8px; font-size: 14px; color: #374151; }
-    /* 次要数据默认折叠，点开才显示 */
-    .more-data { margin-top: 8px; font-size: 13px; color: #475569; line-height: 1.7; }
-    .more-data summary { cursor: pointer; color: #2563eb; font-weight: 600; }
-    .more-data[open] summary { margin-bottom: 4px; }
-    /* PID 公式卡：每项一行，代入真实数字，颜色与 P/I/D 对应 */
-    #controlBreakdown { border-left: 3px solid #2563eb; margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
-    #controlBreakdown strong { color: #1f2937; }
-    .formula { display: grid; gap: 3px; margin-top: 4px; }
-    .formula-row { display: flex; align-items: baseline; gap: 7px; }
-    .term { flex: 0 0 20px; height: 20px; line-height: 20px; text-align: center;
-      border-radius: 5px; color: #fff; font-weight: 700; font-size: 12px; }
-    .term-p { background: #2563eb; }
-    .term-i { background: #d97706; }
-    .term-d { background: #059669; }
-    .term-sum { background: #1f2937; }
-    .expr { font-family: Consolas, "Courier New", monospace; font-size: 13px; color: #374151; }
-    .expr b { color: #c2410c; }
-    .expr .res-p { color: #2563eb; font-size: 15px; }
-    .expr .res-i { color: #d97706; font-size: 15px; }
-    .expr .res-d { color: #059669; font-size: 15px; }
-    .expr .res-sum { color: #1f2937; font-size: 15px; }
-    .formula-path { font-size: 12px; color: #475569; font-family: inherit; }
-    .formula-path b { color: #2563eb; }
-    .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
-    .chart-head h3 { margin: 0; }
-    .chart-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .chart-tools .btn { margin-top: 0; }
-    .scrubber-wrap { margin-top: 10px; display: grid; gap: 6px; }
-    .scrubber-label { display: flex; justify-content: space-between; gap: 12px; color: #64748b; font-size: 13px; }
-    .scrubber { width: 100%; accent-color: #2563eb; }
-    .scrubber:disabled { opacity: 0.45; cursor: not-allowed; }
-
-    @media (max-width: 920px) {
-      .container { flex-direction: column; }
-      .left { width: 100%; }
-      .scrubber-label { flex-direction: column; gap: 2px; }
-    }
   </style>
 </head>
 <body>
@@ -268,6 +196,8 @@
     </div>
   </div>
 
+  <script src="../../core/chart.js"></script>
+  <script src="../../core/controls.js"></script>
   <script>
     const tips = [
       "先观察纯 P 的静差，再增加 I；普通水池通常用 PI 就足够。",
@@ -289,14 +219,6 @@
     ];
     let tipIndex = 0;
     const tipElement = document.getElementById("loadingTip");
-    function showNextTip() {
-      tipElement.classList.add("is-changing");
-      window.setTimeout(() => {
-        tipIndex = (tipIndex + 1) % tips.length;
-        tipElement.textContent = `调参小贴士：${tips[tipIndex]}`;
-        tipElement.classList.remove("is-changing");
-      }, 250);
-    }
     tipElement.addEventListener("click", showNextTip);
     window.setInterval(showNextTip, 6000);
 
@@ -361,19 +283,6 @@
     const scrubberStateEl = document.getElementById("scrubberState");
     const scrubberRangeEl = document.getElementById("scrubberRange");
 
-    function resizeCanvas() {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawChart();
-    }
-
-    function roundToStep(v, step) {
-      return Math.round(v / step) * step;
-    }
-
     function syncUI() {
       document.getElementById("setPoint").value = setPoint;
       document.getElementById("setPointVal").textContent = setPoint.toFixed(1);
@@ -386,21 +295,6 @@
       updateTargetLine();
       updateReadout();
       drawChart();
-    }
-
-    function adjustParam(name, delta) {
-      const input = document.getElementById(name);
-      const step = parseFloat(input.step) || 0.1;
-      let value = roundToStep(parseFloat(input.value) + delta, step);
-      value = Math.max(parseFloat(input.min), Math.min(parseFloat(input.max), value));
-
-      if (name === "setPoint") setPoint = value;
-      if (name === "kp") kp = value * kpScale;
-      if (name === "ki") ki = value * kiScale;
-      if (name === "kd") kd = value * kdScale;
-
-      // 微调同样不重启系统，参数即时生效
-      syncUI();
     }
 
     function loadPreset(name) {
@@ -519,37 +413,6 @@
       updateScrubberUI();
       drawChart();
     });
-
-    function getLatestViewStart() {
-      return Math.max(0, history.length - visiblePoints);
-    }
-
-    function formatTime(index) {
-      return (history[index]?.time || 0).toFixed(1) + "s";
-    }
-
-    function updateScrubberUI() {
-      const maxStart = getLatestViewStart();
-      if (!isPaused) {
-        viewStartIndex = maxStart;
-      } else {
-        viewStartIndex = Math.max(0, Math.min(viewStartIndex, maxStart));
-      }
-
-      historyScrubber.max = String(maxStart);
-      historyScrubber.value = String(viewStartIndex);
-      historyScrubber.disabled = !isPaused || maxStart === 0;
-      toggleRunBtn.textContent = isPaused ? "启动" : "暂停";
-      scrubberStateEl.textContent = isPaused ? "已暂停：可拖动滑块回看" : "运行中：显示最新曲线";
-
-      if (history.length === 0) {
-        scrubberRangeEl.textContent = "0.0s - 0.0s";
-        return;
-      }
-
-      const endIndex = Math.min(history.length, viewStartIndex + visiblePoints);
-      scrubberRangeEl.textContent = formatTime(viewStartIndex) + " - " + formatTime(endIndex - 1);
-    }
 
     function updateReadout() {
       const error = setPoint - currentLevel;
@@ -686,63 +549,11 @@
     }
 
     function drawChart() {
-      const rect = canvas.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
-      const start = isPaused ? viewStartIndex : getLatestViewStart();
-      const end = Math.min(history.length, start + visiblePoints);
-
-      ctx.clearRect(0, 0, w, h);
-
-      ctx.strokeStyle = "#e5e7eb";
-      ctx.lineWidth = 1;
-      for (let i = 1; i < 5; i++) {
-        const gy = (h / 5) * i;
-        ctx.beginPath();
-        ctx.moveTo(0, gy);
-        ctx.lineTo(w, gy);
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      const ty = h - setPoint / tankHeight * h;
-      ctx.moveTo(0, ty);
-      ctx.lineTo(w, ty);
-      ctx.stroke();
-
-      ctx.strokeStyle = "#2563eb";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = start; i < end; i++) {
-        const point = history[i];
-        if (point == null) continue;
-        const progress = end - start <= 1 ? 0 : (i - start) / (end - start - 1);
-        const x = progress * w;
-        const y = h - point.level / tankHeight * h;
-        if (i === start) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-
-    function loop(timestamp) {
-      if (lastFrameTime !== null && !isPaused && !document.hidden) {
-        accumulator += (timestamp - lastFrameTime) / 1000 * simulationSpeed;
-        // 固定步长推进，渲染只做一次。积压保留到后续帧，不把大步长传入物理模型。
-        let steps = 0;
-        while (accumulator >= dt && steps < 2400) {
-          pidControl();
-          accumulator -= dt;
-          steps++;
-        }
-      }
-      lastFrameTime = timestamp;
-      updateReadout();
-      updateScrubberUI();
-      drawChart();
-      requestAnimationFrame(loop);
+      renderChart(canvas, ctx, {
+        max: tankHeight,
+        target: setPoint,
+        series: [{ value: point => point.level, color: "#2563eb", width: 2 }]
+      });
     }
 
     syncUI();

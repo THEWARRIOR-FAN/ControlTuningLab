@@ -5,8 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'experiments', 'temp-tuner', 'index.html'), 'utf8');
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'experiments', 'temp-tuner', 'index.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+// 共享 core 先于页面脚本加载，与浏览器中的 classic script 顺序一致
+const coreScript = ['core/chart.js', 'core/controls.js']
+  .map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
 
 function createSimulation() {
   const elements = new Map();
@@ -34,6 +38,7 @@ function createSimulation() {
     window: { devicePixelRatio: 1, setTimeout() {}, setInterval() {}, addEventListener() {} },
     requestAnimationFrame() {}
   });
+  vm.runInContext(coreScript, context);
   vm.runInContext(script, context);
   return code => vm.runInContext(code, context);
 }
