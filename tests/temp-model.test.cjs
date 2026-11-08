@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'temp-tuner.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'experiments', 'temp-tuner', 'index.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
 function createSimulation() {

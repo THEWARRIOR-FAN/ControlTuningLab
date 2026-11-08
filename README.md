@@ -17,21 +17,21 @@
 
 **方式一：直接打开**
 
-双击 `water-tuner.html` 或 `temp-tuner.html`，用任意现代浏览器打开即可。
+双击 `experiments/water-tuner/index.html` 或 `experiments/temp-tuner/index.html`，用任意现代浏览器打开即可。
 
 **方式二：本地静态服务**
 
 ```bash
 python -m http.server 8000
-# 浏览器访问 http://localhost:8000/water-tuner.html
-#           http://localhost:8000/temp-tuner.html
+# 浏览器访问 http://localhost:8000/experiments/water-tuner/index.html
+#           http://localhost:8000/experiments/temp-tuner/index.html
 ```
 
 ## 功能特性
 
 两个实验共享同一套交互骨架：参数滑块 + 微调按钮、预设带预期现象说明、PID 公式卡实时代入数字、Canvas 曲线可暂停回看、1×/50×/100× 倍速与固定物理步长。
 
-**水位调参实验（`water-tuner.html`）**
+**水位调参实验（`experiments/water-tuner/index.html`）**
 
 - 实时水位仿真与可视化，目标水位可调
 - 核心区只放关键量：当前液位、目标、误差、实际阀位四个大字指标
@@ -41,7 +41,7 @@ python -m http.server 8000
 - 基于真实单位的体积守恒和底部小孔出流模型
 - 推荐 PI 参数与 P / PI / PID 三组实验预设（不是在线自动整定）
 
-**调温实验（`temp-tuner.html`）**
+**调温实验（`experiments/temp-tuner/index.html`）**
 
 - 实时水温仿真：0–100 °C 双柱温度刻度条——橙柱为实际水温、蓝柱为测量温度（控制器所见），两柱顶差即传感器滞后；红色目标线与橙色虚线标出控制误差，加热管红热程度跟随功率
 - 双曲线对比：蓝实线测量温度、橙虚线实际水温，直接看见 25 s 传感器滞后
@@ -49,7 +49,7 @@ python -m http.server 8000
 - 六组预设覆盖 P 偏小/合适/偏大、PI 合适、I 过大、PID 微调六种现象
 - 预期现象均为实测标定（静差、超调、振幅、周期），可对照曲线验证
 
-## 当前实验：水位调参（`water-tuner.html`）
+## 当前实验：水位调参（`experiments/water-tuner/index.html`）
 
 **实验目的**：理解 PID 控制器的工作原理，掌握 Kp、Ki、Kd 对系统性能的影响。
 
@@ -90,7 +90,7 @@ h_next = h + (Qin - Qout) / 1.0 × dt             (m)
 
 0.6 m 时存水 600 L，出水约 0.647 L/s，平衡阀位约 32.4%。阀门指令纯延迟 0.3 s，一阶响应时间常数 1 s；测量微分低通时间常数 0.5 s。采用 0.05 s 固定步长、条件积分抗饱和，超出池顶的水计入累计溢流。理论静差是平衡解预测，不代表任意参数都能稳定收敛。目标滑块范围为 0–1 m；目标设为 1.0 m 时正好位于池顶，超调或进水累积可能触发溢流，因此该读数默认折叠、仅作异常指示。
 
-该模型不包含长管阻力、泵曲线、非线性阀门特性及水面晃荡。物理参数集中在 `water-tuner.html` 的 `tankArea`、`tankHeight`、`maxInflow`、`outletDiameter` 等常量处；修改时需同步调整页面说明、预设和文档。水池容量仅由截面积乘池高确定，不能单独用容量推出目标水位。
+该模型不包含长管阻力、泵曲线、非线性阀门特性及水面晃荡。物理参数集中在 `experiments/water-tuner/index.html` 的 `tankArea`、`tankHeight`、`maxInflow`、`outletDiameter` 等常量处；修改时需同步调整页面说明、预设和文档。水池容量仅由截面积乘池高确定，不能单独用容量推出目标水位。
 
 **验证**（需 Node.js，无第三方依赖）：
 
@@ -100,7 +100,7 @@ node --test tests/water-model.test.cjs
 
 覆盖流量、进出水平衡、P 静差、PI/PID 收敛、目标下降、空池/满池、帧率独立性、暂停重置与历史时间戳，以及 PID 分项拆解、限幅抗饱和和预设说明。
 
-## 当前实验：调温模型（`temp-tuner.html`）
+## 当前实验：调温模型（`experiments/temp-tuner/index.html`）
 
 **实验目的**：用温度对象复现 P/I/D 的典型现象——纯 P 偏大超调振荡、偏小加热慢留静差，I 过大振荡加剧、合适则误差消失，D 用于微调减少超调与波动。
 
@@ -127,7 +127,7 @@ node --test tests/water-model.test.cjs
 
 60 °C 平衡需 266.7 W（53.3%），满功率极限 20 + 500×0.15 = 95 °C，热时间常数 R×C ≈ 1255.8 s。指令延迟 20 s、加热管一阶惯性 6 s、测温传感器一阶惯性 25 s、微分低通 4 s；控制器只看测量温度（曲线中蓝实线），橙虚线为实际水温，两者之差即传感器滞后。采用 0.1 s 固定步长、条件积分抗饱和；微分作用在测量值上且在传感器更新前记录上次测量，目标突变不会产生微分冲击（实测首步 D≈0.005）。
 
-该模型不含沸腾相变、环境温度漂移与保温层非线性。物理参数集中在 `temp-tuner.html` 的 `heatCapacity`、`thermalResistance`、`sensorTimeConstant` 等常量处；修改时需同步调整页面说明、预设和文档。
+该模型不含沸腾相变、环境温度漂移与保温层非线性。物理参数集中在 `experiments/temp-tuner/index.html` 的 `heatCapacity`、`thermalResistance`、`sensorTimeConstant` 等常量处；修改时需同步调整页面说明、预设和文档。
 
 **验证**（需 Node.js，无第三方依赖）：
 
@@ -142,8 +142,8 @@ node --test tests/temp-model.test.cjs
 ```
 .
 ├── index.html            # GitHub Pages 入口（选择实验）
-├── water-tuner.html      # 水位调参实验（水位对象，单文件内联）
-├── temp-tuner.html       # 调温模型实验（温度，单文件内联）
+├── experiments/water-tuner/index.html      # 水位调参实验（水位对象，单文件内联）
+├── experiments/temp-tuner/index.html       # 调温模型实验（温度，单文件内联）
 ├── 实验介绍.md            # 实验系列的详细说明
 ├── README.md             # 本文件
 ├── tests/                # node:test 测试（无第三方依赖）
