@@ -7,9 +7,9 @@ const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'experiments', 'water-tuner', 'index.html'), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-// 共享 core 先于页面脚本加载，与浏览器中的 classic script 顺序一致
-const coreScript = ['core/chart.js', 'core/controls.js']
+// 按浏览器加载顺序拼接脚本：core 共享库 → 仿真模型 → 界面。不再从 HTML 正则提取，
+// 页面结构调整（改标记、加 script 块）不会影响测试。
+const script = ['core/chart.js', 'core/controls.js', 'experiments/water-tuner/model.js', 'experiments/water-tuner/ui.js']
   .map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
 
 function createSimulation() {
@@ -38,7 +38,6 @@ function createSimulation() {
     window: { devicePixelRatio: 1, setTimeout() {}, setInterval() {}, addEventListener() {} },
     requestAnimationFrame() {}
   });
-  vm.runInContext(coreScript, context);
   vm.runInContext(script, context);
   return code => vm.runInContext(code, context);
 }
