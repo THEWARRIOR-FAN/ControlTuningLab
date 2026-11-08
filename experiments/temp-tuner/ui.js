@@ -24,9 +24,6 @@
     window.setInterval(showNextTip, 6000);
 
     const gaugeBoxEl = document.getElementById("gaugeBox");
-    const targetLineEl = document.getElementById("targetLine");
-    const targetTagEl = document.getElementById("targetTag");
-    const actualLineEl = document.getElementById("actualLine");
     const potEl = document.getElementById("pot");
     const potWaterEl = document.getElementById("potWater");
     const tempBarEl = document.getElementById("tempBar");
@@ -134,9 +131,7 @@
     }
 
     function updateTargetLine() {
-      // 刻度范围 0–100 °C：锅内红线与温度条目标刻度同步摆放
-      targetLineEl.style.bottom = setPoint + "%";
-      targetTagEl.textContent = setPoint.toFixed(0);
+      // 目标刻度：温度条上的红色标线跟随目标温度（0–100 °C）
       targetBarEl.style.left = setPoint + "%";
     }
 
@@ -190,7 +185,7 @@
 
     function updateReadout() {
       const error = setPoint - measuredTemp;
-      // 大锅：水量固定，橙虚线 = 实际水温所在高度；温度越高气泡越多，水色越暖、锅底暖光越强
+      // 大锅：水量固定，温度越高气泡越多，水色越暖、锅底暖光越强
       const actualPercent = Math.max(0, Math.min(100, currentTemp));
       const measuredPercent = Math.max(0, Math.min(100, measuredTemp));
       const heatRatio = actualPercent / 100;
@@ -198,7 +193,6 @@
       potWaterEl.style.background =
         `linear-gradient(180deg, hsl(${hue} 82% ${(70 - 12 * heatRatio).toFixed(0)}%), hsl(${hue} 90% ${(54 - 14 * heatRatio).toFixed(0)}%))`;
       potWaterEl.style.boxShadow = `inset 0 -16px 24px rgba(249,115,22,${(0.06 + 0.34 * heatRatio).toFixed(3)})`;
-      actualLineEl.style.bottom = actualPercent + "%";
       // 温度条：填充 = 水温、红刻度 = 目标、蓝刻度 = 测量（控制器所见）；水温贴住目标 ±0.5 °C 时整条变绿
       actualBarEl.style.width = actualPercent + "%";
       measuredBarEl.style.left = measuredPercent + "%";
