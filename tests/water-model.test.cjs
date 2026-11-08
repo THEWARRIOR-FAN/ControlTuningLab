@@ -1,46 +1,12 @@
 // 无第三方依赖：node --test tests/water-model.test.cjs
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const { createSimulation: createExperiment, loadHtml, loadScript } = require('./helpers/harness.cjs');
 
-const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'experiments', 'water-tuner', 'index.html'), 'utf8');
-// 按浏览器加载顺序拼接脚本：core 共享库 → 仿真模型 → 界面。不再从 HTML 正则提取，
-// 页面结构调整（改标记、加 script 块）不会影响测试。
-const script = ['core/chart.js', 'core/controls.js', 'experiments/water-tuner/model.js', 'experiments/water-tuner/ui.js']
-  .map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
-
-function createSimulation() {
-  const elements = new Map();
-  const context2d = new Proxy({}, { get: () => () => {} });
-  function element(id) {
-    if (!elements.has(id)) elements.set(id, {
-      style: {}, classList: { toggle() {}, remove() {}, add() {} },
-      clientHeight: 300, value: '', listeners: {},
-      addEventListener(name, callback) { this.listeners[name] = callback; },
-      getContext() { return context2d; },
-      getBoundingClientRect() { return { width: 600, height: 260 }; }
-    });
-    return elements.get(id);
-  }
-  const context = vm.createContext({
-    document: {
-      hidden: false,
-      getElementById(id) {
-        assert.ok(html.includes(`id="${id}"`), `Missing element: ${id}`);
-        return element(id);
-      },
-      querySelector: element,
-      addEventListener() {}
-    },
-    window: { devicePixelRatio: 1, setTimeout() {}, setInterval() {}, addEventListener() {} },
-    requestAnimationFrame() {}
-  });
-  vm.runInContext(script, context);
-  return code => vm.runInContext(code, context);
-}
+// 本文件所有用例都跑水位实验；脚手架在 helpers/harness.cjs 中共享
+const createSimulation = () => createExperiment('water-tuner');
+const html = loadHtml('water-tuner');
+const script = loadScript('water-tuner');
 
 test('20 mm outlet at 0.6 m drains about 0.647 L/s', () => {
   const run = createSimulation();
