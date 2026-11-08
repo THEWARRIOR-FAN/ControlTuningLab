@@ -182,7 +182,7 @@ test('sensor lag is visible: measurement trails actual temperature while heating
   const actual = run('currentTemp');
   const measured = run('measuredTemp');
   assert.ok(actual > measured + 0.5, `升温中实际 ${actual.toFixed(2)} 应明显高于测量 ${measured.toFixed(2)}`);
-  // 刻度条读数：橙柱 = 实际水温，蓝柱 = 测量温度，滞后标签 = 两者之差
+  // 温度条读数：实际 = 水温、测量 = 控制器所见，滞后标签 = 两者之差
   run('updateReadout();');
   assert.equal(run('document.getElementById("barMeasuredVal").textContent'),
     run('measuredTemp').toFixed(1));

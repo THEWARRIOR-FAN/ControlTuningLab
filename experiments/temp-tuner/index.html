@@ -6,37 +6,101 @@
   <title>调温模型实验</title>
   <link rel="stylesheet" href="../../core/theme.css">
   <style>
-    /* 温度刻度条：0–100 °C 双柱（橙 = 实际水温，蓝 = 测量温度），两柱顶差即传感器滞后
+    /* 温度响应可视化：大锅烧水（锅内水量固定，红/橙线标出目标/实际水温高度；温度越高气泡越多、
+       锅底火光跟随功率），锅下温度条填充 = 水温，贴住红色目标刻度变绿、蓝刻度为测量温度
        （布局、控件、公式卡等共享样式见 core/theme.css） */
     .gauge-box { position: relative; width: 100%; height: 300px; border: 1px solid #d1d5db; border-radius: 12px; margin: 14px 0 16px; background: #fff; overflow: hidden; }
-    .gauge-track { position: absolute; left: 10px; right: 10px; top: 12px; bottom: 66px;
+    /* 锅区：顶部 34px 留给蒸汽，底部 96px 接加热管与温度条 */
+    .gauge-track { position: absolute; left: 10px; right: 10px; top: 34px; bottom: 96px;
       background: repeating-linear-gradient(to top, #eef2f7 0 1px, transparent 1px 20%); }
     /* 刻度：左侧 0–100 °C 标注，与 20% 网格线对齐 */
     .scale-tick { position: absolute; left: 2px; font-size: 10px; color: #94a3b8; transform: translateY(50%); }
-    /* 目标温度线（红，实线，样式在 core/theme.css）与实际水温基准线（橙，虚线） */
+    /* 锅内参考线（只跨锅体，不横穿整框）：目标温度线（红，实线，样式在 core/theme.css）与实际水温线（橙，虚线） */
     .target-tag { position: absolute; right: 6px; top: -9px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
     .actual-line { position: absolute; left: 0; width: 100%; height: 0; border-top: 2px dashed #f97316; z-index: 9; }
-    .gauge-cols { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; gap: 44px; padding: 0 54px; }
-    .gauge-col { position: relative; width: 46px; height: 100%; background: #f8fafc; border: 1px solid #cbd5e1; border-bottom: none; border-radius: 8px 8px 0 0; overflow: hidden; }
-    .bar { position: absolute; left: 0; right: 0; bottom: 0; transition: height .1s linear; }
-    .bar-actual { background: linear-gradient(180deg, #fb923c, #ea580c); }
-    .bar-measured { background: linear-gradient(180deg, #60a5fa, #2563eb); }
-    /* 柱下读数：颜色与柱体一致 */
-    .gauge-labels { position: absolute; left: 0; right: 0; bottom: 44px; display: flex; justify-content: center; gap: 44px; font-size: 11px; color: #64748b; }
-    .gauge-labels span { width: 46px; text-align: center; white-space: nowrap; }
+    /* 大锅：水量固定满锅，两侧双耳把手；温度由气泡、水色与参考线表示 */
+    .pot { position: absolute; left: 50%; transform: translateX(-50%); top: 0; bottom: 0; width: 250px;
+      border: 3px solid #64748b; border-top: 5px solid #4b5563; border-radius: 4px 4px 44px 44px;
+      background: rgba(255,255,255,.5); z-index: 4; }
+    .pot::before, .pot::after { content: ""; position: absolute; top: 18px; width: 20px; height: 20px; border: 5px solid #64748b; }
+    .pot::before { left: -25px; border-right: none; border-radius: 14px 0 0 14px; }
+    .pot::after { right: -25px; border-left: none; border-radius: 0 14px 14px 0; }
+    /* 锅内水：水量固定不随温度/参数变化；水色渐变与锅底暖光由 JS 按水温插值 */
+    .pot-water { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; overflow: hidden;
+      border-radius: 0 0 40px 40px; background: linear-gradient(180deg, #93c5fd, #3b82f6); }
+    .pot-water::before { content: ""; position: absolute; left: 0; top: 0; width: 200%; height: 7px;
+      background: repeating-linear-gradient(110deg, rgba(255,255,255,.4) 0 14px, rgba(255,255,255,0) 14px 36px);
+      animation: surfaceFlow 2.6s linear infinite; }
+    .pot-water::after { content: ""; position: absolute; left: 0; top: 6px; width: 200%; height: 7px;
+      background: repeating-linear-gradient(70deg, rgba(255,255,255,.16) 0 14px, rgba(255,255,255,0) 14px 36px);
+      animation: surfaceFlow 4.2s linear infinite reverse; }
+    @keyframes surfaceFlow { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    /* 沸腾气泡：按温度分档（bub-1…bub-4 对应 30/50/70/90 °C 起），越高同时上升的气泡越多、越急 */
+    .bubble { position: absolute; bottom: -6px; width: 8px; height: 8px; border-radius: 50%; opacity: 0;
+      background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.95), rgba(255,255,255,.25)); }
+    .pot .bubble { animation-duration: 1.7s; animation-timing-function: linear; animation-iteration-count: infinite; }
+    .pot.bub-1 .bubble:nth-child(1),
+    .pot.bub-2 .bubble:nth-child(-n+2),
+    .pot.bub-3 .bubble:nth-child(-n+3),
+    .pot.bub-4 .bubble { animation-name: bubbleRise; }
+    .pot .bubble:nth-child(2) { animation-delay: .45s; }
+    .pot .bubble:nth-child(3) { animation-delay: .95s; }
+    .pot .bubble:nth-child(4) { width: 6px; height: 6px; animation-delay: 1.3s; }
+    .pot.bub-3 .bubble, .pot.bub-4 .bubble { animation-duration: 1.2s; }
+    .pot.bub-4 .bubble { animation-duration: .85s; }
+    @keyframes bubbleRise { 0% { transform: translateY(0) scale(.6); opacity: 0; } 12% { opacity: .9; }
+      100% { transform: translateY(-200px) scale(1.15); opacity: 0; } }
+    /* 蒸汽：水温 ≥50 °C 起飘出，越热越明显 */
+    .steam { position: absolute; left: 50%; top: -26px; transform: translateX(-50%); width: 96px; height: 24px;
+      opacity: 0; transition: opacity .4s; pointer-events: none; }
+    .pot.bub-2 .steam { opacity: .45; }
+    .pot.bub-3 .steam, .pot.bub-4 .steam { opacity: .9; }
+    .steam span { position: absolute; bottom: 0; width: 12px; height: 22px; border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(148,163,184,.6), rgba(148,163,184,0) 70%);
+      animation: steamRise 2.4s ease-in-out infinite; }
+    .steam span:nth-child(1) { left: 10px; }
+    .steam span:nth-child(2) { left: 42px; animation-delay: .8s; }
+    .steam span:nth-child(3) { left: 74px; animation-delay: 1.6s; }
+    @keyframes steamRise { 0% { transform: translateY(6px) scale(.7); opacity: 0; } 30% { opacity: .9; }
+      100% { transform: translateY(-16px) scale(1.3); opacity: 0; } }
+    /* 锅底加热管：红热程度跟随实际功率，点燃（.is-lit）时窜出火苗 */
+    .heater { position: absolute; left: 50%; transform: translateX(-50%); bottom: 72px; width: 268px; height: 14px; border-radius: 7px;
+      background: repeating-linear-gradient(90deg, #7f1d1d 0 10px, #b91c1c 10px 20px);
+      z-index: 8; transition: box-shadow .2s linear, background .2s linear; }
+    .heater::before { content: ""; position: absolute; left: 6px; right: 6px; top: -15px; height: 17px; opacity: 0; transition: opacity .2s linear;
+      background-image: radial-gradient(ellipse 6px 15px at 50% 100%, rgba(251,146,60,.95) 0 58%, rgba(249,115,22,0) 70%);
+      background-size: 24px 17px; background-repeat: repeat-x; transform-origin: bottom center; }
+    .heater.is-lit::before { opacity: 1; animation: flameFlicker .32s ease-in-out infinite alternate; }
+    @keyframes flameFlicker { from { transform: scaleY(.8); } to { transform: scaleY(1.1); } }
+    /* 温度条：填充宽度 = 实际水温；贴住红色目标刻度（±0.5 °C）整条变绿，蓝刻度 = 测量温度 */
+    .temp-bar { position: absolute; left: 10px; right: 10px; bottom: 44px; height: 16px;
+      border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; }
+    .temp-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 7px;
+      background: linear-gradient(180deg, #fb923c, #ea580c); transition: width .1s linear, background .2s linear; }
+    .temp-bar.is-reached { border-color: #16a34a; box-shadow: 0 0 6px rgba(22,163,74,.35); }
+    .temp-bar.is-reached .temp-bar-fill { background: linear-gradient(180deg, #4ade80, #16a34a); }
+    .temp-bar-target { position: absolute; top: -5px; bottom: -5px; width: 3px; border-radius: 2px;
+      background: #ef4444; transform: translateX(-1.5px); z-index: 3; }
+    .temp-bar-measured { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px;
+      background: #2563eb; transform: translateX(-1.5px); z-index: 4; }
+    /* 条下读数：颜色与温度条刻度一致 */
+    .gauge-labels { position: absolute; left: 0; right: 0; bottom: 20px; display: flex; justify-content: center; gap: 44px; font-size: 11px; color: #64748b; }
     .lbl-actual { color: #c2410c; }
     .lbl-measured { color: #1d4ed8; }
     /* 传感器滞后的数值读出 */
-    .lag-tag { position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; font-size: 11px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
-    /* 底部加热管：亮度/红热程度跟随实际功率 */
-    .heater { position: absolute; left: 12%; right: 12%; bottom: 8px; height: 14px; border-radius: 7px;
-      background: repeating-linear-gradient(90deg, #7f1d1d 0 10px, #b91c1c 10px 20px);
-      z-index: 8; transition: box-shadow .2s linear, background .2s linear; }
+    .lag-tag { position: absolute; left: 50%; transform: translateX(-50%); bottom: 2px; font-size: 11px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
     /* 曲线图例：蓝实线测量、橙虚线实际、红实线目标 */
     .legend { display: flex; gap: 12px; font-size: 12px; color: #6b7280; align-items: center; }
     .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 4px; vertical-align: middle; border-radius: 2px; background: #2563eb; }
     .legend .lg-actual::before { background: #f97316; }
     .legend .lg-target::before { background: #ef4444; }
+    /* 暂停时冻结锅内水面、气泡、蒸汽与火苗动画 */
+    .gauge-box.is-paused .pot-water::before, .gauge-box.is-paused .pot-water::after,
+    .gauge-box.is-paused .bubble, .gauge-box.is-paused .steam span,
+    .gauge-box.is-paused .heater::before { animation-play-state: paused; }
+    @media (prefers-reduced-motion: reduce) {
+      .pot-water::before, .pot-water::after, .bubble, .steam span, .heater.is-lit::before { animation: none; }
+    }
   </style>
 </head>
 <body>
@@ -125,19 +189,29 @@
           <span class="scale-tick" style="bottom:60%">60</span>
           <span class="scale-tick" style="bottom:80%">80</span>
           <span class="scale-tick" style="bottom:100%">100</span>
-          <div class="actual-line" id="actualLine" aria-hidden="true"></div>
-          <div class="target-line" id="targetLine"><span class="target-tag" id="targetTag">60</span></div>
-          <div class="gauge-cols">
-            <div class="gauge-col" title="实际水温"><div class="bar bar-actual" id="barActual"></div></div>
-            <div class="gauge-col" title="测量温度"><div class="bar bar-measured" id="barMeasured"></div></div>
+          <div class="pot" id="pot" title="锅内水量固定；红/橙线为目标/实际水温高度，气泡随温度增多">
+            <div class="pot-water" id="potWater">
+              <span class="bubble" style="left:20%"></span>
+              <span class="bubble" style="left:46%"></span>
+              <span class="bubble" style="left:72%"></span>
+              <span class="bubble" style="left:34%"></span>
+            </div>
+            <div class="actual-line" id="actualLine" aria-hidden="true"></div>
+            <div class="target-line" id="targetLine"><span class="target-tag" id="targetTag">60</span></div>
+            <div class="steam" aria-hidden="true"><span></span><span></span><span></span></div>
           </div>
+        </div>
+        <div class="heater" id="heater" aria-hidden="true"></div>
+        <div class="temp-bar" id="tempBar" title="温度条：填充 = 实际水温，贴住红色目标刻度变绿">
+          <div class="temp-bar-fill" id="barActual"></div>
+          <div class="temp-bar-target" id="barTarget"></div>
+          <div class="temp-bar-measured" id="barMeasured"></div>
         </div>
         <div class="gauge-labels">
           <span class="lbl-actual">实际 <b id="barActualVal">20.0</b>°</span>
           <span class="lbl-measured">测量 <b id="barMeasuredVal">20.0</b>°</span>
         </div>
         <div class="lag-tag" id="lagTag">传感器滞后 Δ 0.0 °C</div>
-        <div class="heater" id="heater" aria-hidden="true"></div>
       </div>
       <div class="key-metrics">
         <div class="metric">

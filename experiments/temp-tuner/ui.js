@@ -27,8 +27,12 @@
     const targetLineEl = document.getElementById("targetLine");
     const targetTagEl = document.getElementById("targetTag");
     const actualLineEl = document.getElementById("actualLine");
-    const actualBarEl = document.getElementById("barActual");
-    const measuredBarEl = document.getElementById("barMeasured");
+    const potEl = document.getElementById("pot");
+    const potWaterEl = document.getElementById("potWater");
+    const tempBarEl = document.getElementById("tempBar");
+    const actualBarEl = document.getElementById("barActual");     // 温度条填充（实际水温）
+    const targetBarEl = document.getElementById("barTarget");     // 温度条上的红色目标刻度
+    const measuredBarEl = document.getElementById("barMeasured"); // 温度条上的蓝色测量刻度
     const barActualValEl = document.getElementById("barActualVal");
     const barMeasuredValEl = document.getElementById("barMeasuredVal");
     const lagTagEl = document.getElementById("lagTag");
@@ -113,6 +117,7 @@
       history = [{ time: 0, temp: ambientTemp, measured: ambientTemp }];
       isPaused = false;
       viewStartIndex = 0;
+      gaugeBoxEl.classList.remove("is-paused");
       updateReadout();
       updateScrubberUI();
       drawChart();
@@ -129,9 +134,10 @@
     }
 
     function updateTargetLine() {
-      // 刻度范围 0–100 °C，目标线按比例摆放
+      // 刻度范围 0–100 °C：锅内红线与温度条目标刻度同步摆放
       targetLineEl.style.bottom = setPoint + "%";
       targetTagEl.textContent = setPoint.toFixed(0);
+      targetBarEl.style.left = setPoint + "%";
     }
 
     // 调参不重启系统：参数改动即时生效，系统从当前状态继续响应，便于观察过渡过程
@@ -161,6 +167,7 @@
       if (!isPaused) {
         viewStartIndex = getLatestViewStart();
       }
+      gaugeBoxEl.classList.toggle("is-paused", isPaused);
       updateScrubberUI();
       drawChart();
     });
@@ -183,17 +190,31 @@
 
     function updateReadout() {
       const error = setPoint - measuredTemp;
-      // 双柱刻度条：橙柱 = 实际水温，蓝柱 = 测量温度（控制器所见），两柱顶差即传感器滞后
+      // 大锅：水量固定，橙虚线 = 实际水温所在高度；温度越高气泡越多，水色越暖、锅底暖光越强
       const actualPercent = Math.max(0, Math.min(100, currentTemp));
       const measuredPercent = Math.max(0, Math.min(100, measuredTemp));
-      actualBarEl.style.height = actualPercent + "%";
-      measuredBarEl.style.height = measuredPercent + "%";
+      const heatRatio = actualPercent / 100;
+      const hue = 212 - 42 * heatRatio;
+      potWaterEl.style.background =
+        `linear-gradient(180deg, hsl(${hue} 82% ${(70 - 12 * heatRatio).toFixed(0)}%), hsl(${hue} 90% ${(54 - 14 * heatRatio).toFixed(0)}%))`;
+      potWaterEl.style.boxShadow = `inset 0 -16px 24px rgba(249,115,22,${(0.06 + 0.34 * heatRatio).toFixed(3)})`;
       actualLineEl.style.bottom = actualPercent + "%";
+      // 温度条：填充 = 水温、红刻度 = 目标、蓝刻度 = 测量（控制器所见）；水温贴住目标 ±0.5 °C 时整条变绿
+      actualBarEl.style.width = actualPercent + "%";
+      measuredBarEl.style.left = measuredPercent + "%";
+      tempBarEl.classList.toggle("is-reached", Math.abs(currentTemp - setPoint) <= 0.5);
       barActualValEl.textContent = currentTemp.toFixed(1);
       barMeasuredValEl.textContent = measuredTemp.toFixed(1);
       lagTagEl.textContent = `传感器滞后 Δ ${(currentTemp - measuredTemp).toFixed(1)} °C`;
-      // 加热管红热程度跟随实际功率
+      // 气泡分档：30/50/70/90 °C 起分别冒出 1–4 个气泡，越热越多、越急
+      const bubbleTier = currentTemp >= 90 ? 4 : currentTemp >= 70 ? 3 : currentTemp >= 50 ? 2 : currentTemp >= 30 ? 1 : 0;
+      potEl.classList.toggle("bub-1", bubbleTier >= 1);
+      potEl.classList.toggle("bub-2", bubbleTier >= 2);
+      potEl.classList.toggle("bub-3", bubbleTier >= 3);
+      potEl.classList.toggle("bub-4", bubbleTier >= 4);
+      // 加热管红热程度跟随实际功率，点燃时窜出火苗
       const powerRatio = actuator / maxValve;
+      heaterEl.classList.toggle("is-lit", powerRatio > 0.02);
       heaterEl.style.background = `repeating-linear-gradient(90deg, hsl(0 ${30 + 60 * powerRatio}% ${18 + 24 * powerRatio}%) 0 10px, hsl(0 ${45 + 50 * powerRatio}% ${26 + 30 * powerRatio}%) 10px 20px)`;
       heaterEl.style.boxShadow = powerRatio > 0.02 ? `0 0 ${8 + 18 * powerRatio}px rgba(239,68,68,${0.25 + 0.55 * powerRatio})` : "none";
 

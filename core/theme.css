@@ -1,5 +1,5 @@
 /* 共享主题：两个实验页共用的布局、控件、指标、公式卡与曲线工具样式。
-   实验专属的可视化（水池 / 温度刻度条）仍写在各页自己的 <style> 里。 */
+   实验专属的可视化（水池 / 大锅与温度条）仍写在各页自己的 <style> 里。 */
 * { box-sizing: border-box; font-family: Arial, sans-serif; }
 body { background: #f5f7fb; max-width: 1120px; margin: 0 auto; padding: 20px; color: #1f2937; }
 h1 { text-align: center; margin: 0 0 8px; }
