@@ -34,7 +34,7 @@ python -m http.server 8000
 | 实验 | 被控对象 | 入口 | 详细说明 |
 | --- | --- | --- | --- |
 | 水位调参 | 1 m³ 敞口水池（进水阀 + 底部小孔出流） | [`experiments/water-tuner/index.html`](experiments/water-tuner/index.html) | [experiments/water-tuner/README.md](experiments/water-tuner/README.md) |
-| 调温模型 | 2 kg 水的加热过程（延迟 + 传感惯性） | [`experiments/temp-tuner/index.html`](experiments/temp-tuner/index.html) | [experiments/temp-tuner/README.md](experiments/temp-tuner/README.md) |
+| 调温模型 | 1 kg 水的加热过程（延迟 + 传感惯性） | [`experiments/temp-tuner/index.html`](experiments/temp-tuner/index.html) | [experiments/temp-tuner/README.md](experiments/temp-tuner/README.md) |
 
 **预设参数表、预期现象实测数值、参数范围与物理模型推导只写在各实验的 README 里**（单一权威）；页面文案携带相同数字，由 `tests/docs-sync.test.cjs` 自动校验，改一处漏一处会被测试抓住。系列导览见 [`docs/实验介绍.md`](docs/实验介绍.md)。
 

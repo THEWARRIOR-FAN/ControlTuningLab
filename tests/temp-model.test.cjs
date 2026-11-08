@@ -10,7 +10,7 @@ const script = loadScript('temp-tuner');
 
 test('heat model constants and equilibrium limits are physical', () => {
   const run = createSimulation();
-  assert.equal(run('heatCapacity'), 8372);
+  assert.equal(run('heatCapacity'), 4186);
   // 60 °C 时散热 = (60-20)/0.15 = 266.67 W
   assert.ok(Math.abs(run('heatLoss(60)') - 266.667) < 0.001);
   assert.equal(run('heatLoss(20)'), 0);
@@ -39,8 +39,8 @@ test('pure P too small: heats slowly and leaves a large steady error', () => {
       pidControl();
       if (t45 === null && measuredTemp >= 45) t45 = (i + 1) * dt;
     }`);
-  // 实测：Kp=4 到 45 °C 需 634.5 s，稳态 50.0 °C，静差 10.0 °C
-  assert.ok(Math.abs(run('t45') - 634.5) < 1, `到45°C 实测 ${run('t45')} s`);
+  // 实测：Kp=4 到 45 °C 需 325.3 s，稳态 50.0 °C，静差 10.0 °C
+  assert.ok(Math.abs(run('t45') - 325.3) < 1, `到45°C 实测 ${run('t45')} s`);
   assert.ok(Math.abs(run('measuredTemp') - 50) < 0.05, `稳态实测 ${run('measuredTemp')}`);
   assert.ok(Math.abs(run('setPoint - measuredTemp') - 10) < 0.05);
   // 加热慢：1500 s 内都没到 60 °C
@@ -51,10 +51,10 @@ test('pure P too large: overshoots then oscillates with measured period', () => 
   const run = createSimulation();
   run(`loadPreset('pLarge'); let peak = 20;
     for (let i = 0; i < 60000; i++) { pidControl(); if (currentTemp > peak) peak = currentTemp; }`);
-  // 实测：超调 0.63 °C
+  // 实测：超调 1.94 °C
   const overshoot = run('peak - setPoint');
-  assert.ok(overshoot > 0.3 && overshoot < 1.2, `超调实测 ${overshoot.toFixed(2)} °C`);
-  // 末段仍在来回振荡：实测振幅 2.08 °C、周期 92 s
+  assert.ok(overshoot > 1.5 && overshoot < 2.5, `超调实测 ${overshoot.toFixed(2)} °C`);
+  // 末段仍在来回振荡：实测振幅 4.70 °C、周期 92 s
   const tail = run(`(() => {
     let lo = 1e9, hi = -1e9, crossings = 0, first = null, last = null, prev = currentTemp - setPoint;
     for (let i = 0; i < 10000; i++) {
@@ -66,7 +66,7 @@ test('pure P too large: overshoots then oscillates with measured period', () => 
     }
     return { amp: hi - lo, period: crossings > 1 ? (last - first) / (crossings - 1) * dt : 0 };
   })()`);
-  assert.ok(tail.amp > 1.5 && tail.amp < 3.0, `振幅实测 ${tail.amp.toFixed(2)} °C`);
+  assert.ok(tail.amp > 4.0 && tail.amp < 5.5, `振幅实测 ${tail.amp.toFixed(2)} °C`);
   assert.ok(tail.period > 60 && tail.period < 130, `周期实测 ${tail.period.toFixed(0)} s`);
 });
 
@@ -84,8 +84,8 @@ test('PI removes the steady error; too-large I makes it oscillate harder', () =>
     for (let i = 0; i < 60000; i++) { pidControl(); if (currentTemp > peak) peak = currentTemp; }`);
   const strongOvershoot = strong('peak - setPoint');
   assert.ok(strongOvershoot > piOvershoot + 0.5,
-    `Ki=1 超调 ${strongOvershoot.toFixed(2)} 应明显大于 Ki=0.3 的 ${piOvershoot.toFixed(2)}`);
-  // 末段仍在振荡：实测振幅 2.62 °C、周期 122 s
+    `Ki=1 超调 ${strongOvershoot.toFixed(2)} 应明显大于 Ki=0.1 的 ${piOvershoot.toFixed(2)}`);
+  // 末段仍在振荡：实测振幅 5.45 °C、周期 117 s
   const tail = strong(`(() => {
     let lo = 1e9, hi = -1e9, crossings = 0, first = null, last = null, prev = currentTemp - setPoint;
     for (let i = 0; i < 10000; i++) {
@@ -101,10 +101,10 @@ test('PI removes the steady error; too-large I makes it oscillate harder', () =>
   assert.ok(tail.period > 80 && tail.period < 160, `周期实测 ${tail.period.toFixed(0)} s`);
 });
 
-test('D is for fine-tuning: same PI with Kd=1500 kills overshoot and ripple', () => {
-  function runWith(kd) {
+test('D is for fine-tuning: same PI with D kills overshoot and ripple', () => {
+  function runWith(overrideKd) {
     const run = createSimulation();
-    run(`loadPreset('pid'); kd = ${kd}; let peak = 20;
+    run(`loadPreset('pid'); ${overrideKd === null ? '' : `kd = ${overrideKd};`} let peak = 20;
       for (let i = 0; i < 60000; i++) { pidControl(); if (currentTemp > peak) peak = currentTemp; }`);
     const overshoot = run('peak - setPoint');
     const amp = run(`(() => {
@@ -115,8 +115,8 @@ test('D is for fine-tuning: same PI with Kd=1500 kills overshoot and ripple', ()
     return { overshoot, amp };
   }
   const withoutD = runWith(0);
-  const withD = runWith(1500);
-  // 实测：Kd 0→1500，超调 0.81→0.00 °C、振幅 1.83→0.00 °C
+  const withD = runWith(null);   // 预设自带 Kd=1000
+  // 实测：Kd 0→1000，超调 1.69→0.03 °C、振幅 3.79→0.00 °C
   assert.ok(withoutD.overshoot > 0.5, `无 D 超调实测 ${withoutD.overshoot.toFixed(2)} °C`);
   assert.ok(withoutD.amp > 1.0, `无 D 振幅实测 ${withoutD.amp.toFixed(2)} °C`);
   assert.ok(withD.overshoot < 0.2, `有 D 超调实测 ${withD.overshoot.toFixed(2)} °C`);
@@ -131,11 +131,12 @@ test('theory predicts pure-P steady error for small Kp, not while oscillating', 
   assert.ok(Math.abs(run('steadyStateError()') - 10) < 0.01);
   run('kp = 20; for (let i = 0; i < 60000; i++) pidControl();');
   assert.ok(Math.abs(run('steadyStateError()') - 2.5) < 0.01);
-  // Kp=100 时系统在振荡，平衡解不再是当前误差
+  // Kp=100 时系统在振荡，平衡解不再是当前误差（实测 |当前误差−理论| ≈ 1.46 °C）
   run('kp = 100; for (let i = 0; i < 60000; i++) pidControl();');
-  assert.ok(Math.abs(run('setPoint - measuredTemp - steadyStateError()') > 0.3));
+  assert.ok(Math.abs(run('setPoint - measuredTemp - steadyStateError()')) > 0.3,
+    `实测差 ${run('setPoint - measuredTemp - steadyStateError()').toFixed(2)} °C`);
   // Ki>0 时理论静差为零（目标 60 °C < 满功率极限 95 °C）
-  run('kp = 50; ki = 0.3; for (let i = 0; i < 60000; i++) pidControl();');
+  run('kp = 30; ki = 0.1; for (let i = 0; i < 60000; i++) pidControl();');
   assert.equal(run('steadyStateError()'), 0);
 });
 
@@ -194,7 +195,7 @@ test('sensor lag is visible: measurement trails actual temperature while heating
 test('preset status explains the expected phenomenon for learners', () => {
   const run = createSimulation();
   run("loadPreset('pSmall');");
-  assert.ok(run('document.getElementById("tuneStatus").textContent').includes('634.5'));
+  assert.ok(run('document.getElementById("tuneStatus").textContent').includes('325.3'));
   run("loadPreset('pOk');");
   assert.ok(run('document.getElementById("tuneStatus").textContent').includes('57.5'));
   run("loadPreset('pLarge');");
@@ -204,7 +205,7 @@ test('preset status explains the expected phenomenon for learners', () => {
   run("loadPreset('iLarge');");
   assert.ok(run('document.getElementById("tuneStatus").textContent').includes('振荡'));
   run("loadPreset('pid');");
-  assert.ok(run('document.getElementById("tuneStatus").textContent').includes('0.81'));
+  assert.ok(run('document.getElementById("tuneStatus").textContent').includes('1.69'));
 });
 
 test('frame rate independent fixed-step timing, pause, speed and reset', () => {
@@ -216,9 +217,10 @@ test('frame rate independent fixed-step timing, pause, speed and reset', () => {
   }
   const slow = simulate(30);
   const fast = simulate(144);
-  // 10× 下按固定步长推进，帧率差异最多造成一个 dt 的累计舍入误差。
+  // 10× 下按固定步长推进，帧率差异最多造成一个 dt 的累计舍入；
+  // 满功率下单步温升约 0.012 °C（500/4186×0.1），故容差取 0.014。
   assert.ok(Math.abs(slow('simulationSteps * dt') - 100) <= 0.11);
-  assert.ok(Math.abs(slow('currentTemp') - fast('currentTemp')) < 0.01);
+  assert.ok(Math.abs(slow('currentTemp') - fast('currentTemp')) < 0.014);
   slow('isPaused = true; loop(11000); loop(12000);');
   const pausedSteps = slow('simulationSteps');
   slow('loop(13000);');
@@ -241,10 +243,10 @@ test('speed options and slider ranges match the calibration targets', () => {
   assert.match(html, /<option value="50" selected>50×<\/option>/);
   assert.match(html, /<option value="100">100×<\/option>/);
   // 滑块范围只是本教学模型的操作边界，不代表真实设备的整定答案
-  assert.match(html, /id="setPoint" min="30" max="90" step="1"/);
+  assert.match(html, /id="setPoint" min="0" max="100" step="1"/);
   assert.match(html, /id="kp" min="0" max="200" step="1"/);
   assert.match(html, /id="ki" min="0" max="100" step="1"/);
   assert.match(html, /id="kd" min="0" max="100" step="1"/);
   assert.match(script, /let kp = 20\.0;\s*\n\s*let ki = 0\.0;/);   // 默认纯 P
-  assert.match(script, /kd = 1500\.0;/);                            // PID 预设用可见的 D
+  assert.match(script, /kd = 1000\.0;/);                            // PID 预设用可见的 D
 });

@@ -23,9 +23,9 @@
     const dt = 0.1;               // 固定物理步长，不随显示帧率或倍速变化
     const ambientTemp = 20;       // 环境温度 °C
     const heaterMaxPower = 500;   // 加热管最大功率 W
-    const waterMass = 2.0;        // 水质量 kg
+    const waterMass = 1.0;        // 水质量 kg
     const specificHeat = 4186;    // 水比热容 J/(kg·°C)
-    const heatCapacity = waterMass * specificHeat; // 8372 J/K
+    const heatCapacity = waterMass * specificHeat; // 4186 J/K
     const thermalResistance = 0.15;      // 热阻 K/W
     const heaterTimeConstant = 6;        // 加热管一阶惯性 s
     const sensorTimeConstant = 25;       // 测温传感器一阶惯性 s

@@ -51,7 +51,7 @@
         <label for="setPoint">目标温度 (°C)</label>
         <div class="param-control">
           <button class="btn param-btn" onclick="adjustParam('setPoint', -1)">-</button>
-          <input type="range" id="setPoint" min="30" max="90" step="1" value="60">
+          <input type="range" id="setPoint" min="0" max="100" step="1" value="60">
           <button class="btn param-btn" onclick="adjustParam('setPoint', 1)">+</button>
         </div>
         <span class="value" id="setPointVal">60</span>
@@ -105,10 +105,10 @@
       </div>
       <details class="more-data">
         <summary>物理模型（SI 单位，点开查看）</summary>
-        水 2.0 kg，比热容 4186 J/(kg·°C)，热容 8372 J/K。<br>
+        水 1.0 kg，比热容 4186 J/(kg·°C)，热容 4186 J/K。<br>
         加热器最大 500 W，实际功率 = 500 × 加热管开度 / 100。<br>
         散热 = (水温 − 20) ÷ 0.15（环境 20 °C、热阻 0.15 K/W）。<br>
-        水温变化率 = (加热功率 − 散热) ÷ 8372。<br>
+        水温变化率 = (加热功率 − 散热) ÷ 4186。<br>
         满功率极限 20 + 500×0.15 = 95 °C；60 °C 平衡需 266.7 W（53.3%）。<br>
         指令延迟 20 s 后到达，加热管按 6 s 一阶惯性动作；测温传感器 25 s 一阶惯性。<br>
         不含沸腾相变、环境温度漂移与保温层非线性。
@@ -188,8 +188,8 @@
       <details class="more-data">
         <summary>更多数据（点开查看）</summary>
         仿真时间 <span class="value" id="simTimeDisplay">0.0</span> s
-        · 水质量 <span class="value" id="massDisplay">2.0</span> kg
-        · 热容 <span class="value" id="capacityDisplay">8372</span> J/K
+        · 水质量 <span class="value" id="massDisplay">1.0</span> kg
+        · 热容 <span class="value" id="capacityDisplay">4186</span> J/K
         · 理论稳态静差（平衡解预测） <span class="value" id="theoryError">2.50</span> °C
       </details>
       <div class="chart-head">
